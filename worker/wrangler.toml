@@ -1,0 +1,13 @@
+name = "rupa-api"
+main = "src/index.js"
+compatibility_date = "2026-09-01"
+
+[vars]
+ALLOWED_ORIGINS = "https://bobbyfch.github.io"
+
+# Create D1 database first: npx wrangler d1 create rupa-archive
+# Then paste your real database_id below and uncomment this block.
+# [[d1_databases]]
+# binding = "ARCHIVE_DB"
+# database_name = "rupa-archive"
+# database_id = "YOUR_REAL_D1_DATABASE_ID"

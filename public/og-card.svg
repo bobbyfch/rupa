@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f5f1e8"/><stop offset="1" stop-color="#e4e7dc"/></linearGradient>
+    <linearGradient id="scene1" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c47957"/><stop offset=".5" stop-color="#e3c58b"/><stop offset="1" stop-color="#596e5a"/></linearGradient>
+    <linearGradient id="scene2" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#3a5970"/><stop offset=".55" stop-color="#e6a787"/><stop offset="1" stop-color="#2f3d42"/></linearGradient>
+    <linearGradient id="scene3" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#788f82"/><stop offset="1" stop-color="#d0bc83"/></linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#paper)"/>
+  <path d="M0 0h1200v9H0z" fill="#34483b"/>
+  <g transform="translate(76 60)">
+    <rect width="46" height="46" rx="14" fill="#34483b"/>
+    <path d="M13 34V12h14c6 0 9 4 9 9 0 4-2 7-6 8l7 7h-9l-6-6h-1v6h-8Zm8-13h6c1 0 2 0 2-2s-1-2-2-2h-6v4Z" fill="#f5f0e5"/>
+    <circle cx="37" cy="10" r="4" fill="#bd7156"/>
+    <text x="62" y="33" fill="#34483b" font-family="Arial,sans-serif" font-size="26" font-weight="700" letter-spacing="4">RUPA</text>
+  </g>
+  <g fill="#697166" font-family="Arial,sans-serif" font-size="13" letter-spacing="3"><text x="78" y="214">WORKS / EDITIONS / SOURCES</text><text x="78" y="570">A VISUAL LIBRARY</text></g>
+  <text x="74" y="316" fill="#27332b" font-family="Georgia,serif" font-size="72" letter-spacing="-4">Art, in its</text>
+  <text x="74" y="397" fill="#a84f3d" font-family="Georgia,serif" font-size="77" font-style="italic" letter-spacing="-4">many forms.</text>
+  <text x="80" y="456" fill="#596458" font-family="Arial,sans-serif" font-size="18">Find the image. Keep the story and source with it.</text>
+  <path d="M79 489h470" stroke="#c9c8ba" stroke-width="1"/>
+  <g transform="translate(677 84)">
+    <g transform="rotate(-7 105 225)">
+      <rect x="15" y="18" width="206" height="366" rx="12" fill="#fdfbf6" stroke="#c9c8ba"/>
+      <rect x="26" y="29" width="184" height="338" rx="6" fill="url(#scene1)"/>
+      <circle cx="122" cy="125" r="54" fill="#f6ddac" opacity=".88"/>
+      <path d="M29 263Q71 202 115 250t92-43v157H29Z" fill="#384d43" opacity=".92"/>
+      <text x="43" y="348" fill="#fff8e8" font-family="Arial,sans-serif" font-size="12" letter-spacing="2">COLLECTION</text>
+    </g>
+    <g transform="rotate(3 325 220)">
+      <rect x="217" y="15" width="220" height="384" rx="12" fill="#fdfbf6" stroke="#c9c8ba"/>
+      <rect x="229" y="27" width="196" height="358" rx="6" fill="url(#scene2)"/>
+      <path d="M232 262 290 191l45 44 31-63 57 83v126H232Z" fill="#34483b" opacity=".88"/>
+      <circle cx="363" cy="104" r="38" fill="#fbebca"/>
+      <text x="245" y="358" fill="#fff8e8" font-family="Arial,sans-serif" font-size="12" letter-spacing="2">FILM ART</text>
+    </g>
+    <g transform="rotate(11 494 230)">
+      <rect x="440" y="54" width="183" height="335" rx="12" fill="#fdfbf6" stroke="#c9c8ba"/>
+      <rect x="450" y="65" width="163" height="313" rx="6" fill="url(#scene3)"/>
+      <path d="M452 262q50-75 96 0t64-13v125H452Z" fill="#405449"/>
+    </g>
+  </g>
+</svg>

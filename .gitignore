@@ -1,0 +1,13 @@
+node_modules/
+.vite/
+dist/
+.dev.vars
+.env
+.env.*
+!.env.example
+.wrangler/
+.DS_Store
+*.log
+# Personal cover copies and other private local files; never committed or deployed
+.local-only/
+/.codex/

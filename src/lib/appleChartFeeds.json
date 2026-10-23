@@ -1,0 +1,10 @@
+{
+  "music": { "albums": "topalbums", "songs": "topsongs" },
+  "musicvideos": { "music-videos": "topmusicvideos" },
+  "movies": { "movies": "topmovies" },
+  "tv": { "tv-seasons": "toptvseasons", "tv-episodes": "toptvepisodes" },
+  "books": { "top-free": "topfreeebooks", "top-paid": "toppaidebooks" },
+  "audiobooks": { "top": "topaudiobooks" },
+  "podcasts": { "top": "toppodcasts" },
+  "apps": { "top-free": "topfreeapplications", "top-paid": "toppaidapplications" }
+}

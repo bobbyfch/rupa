@@ -1,0 +1,526 @@
+{
+ "schemaVersion": 1,
+ "checkedAt": "2026-10-22T09:26:24.750Z",
+ "sampleSizePerShard": 10,
+ "note": "Measured from the ingest machine. Ranged GET of the first 96 KiB; dimensions come from the file header. 403/429 are reported, never bypassed.",
+ "probes": [
+  {
+   "id": "cleveland-cc0",
+   "url": "https://openaccess-api.clevelandart.org/api/artworks/?cc0=1&has_image=1&limit=1",
+   "status": 200,
+   "ok": true,
+   "contentType": "application/json",
+   "ms": 1100
+  },
+  {
+   "id": "met",
+   "url": "https://collectionapi.metmuseum.org/public/collection/v1/objects/436535",
+   "status": 200,
+   "ok": true,
+   "contentType": "application/json",
+   "ms": 487
+  },
+  {
+   "id": "aic",
+   "url": "https://api.artic.edu/api/v1/artworks?fields=id,title,image_id,is_public_domain&limit=1",
+   "status": 403,
+   "ok": false,
+   "contentType": "text/html",
+   "ms": 230
+  },
+  {
+   "id": "commons",
+   "url": "https://commons.wikimedia.org/w/api.php?action=query&list=search&srsearch=poster&srnamespace=6&srlimit=1&format=json",
+   "status": 200,
+   "ok": true,
+   "contentType": "application/json",
+   "ms": 627
+  },
+  {
+   "id": "openverse",
+   "url": "https://api.openverse.org/v1/images/?q=art%20nouveau&page_size=1",
+   "status": 200,
+   "ok": true,
+   "contentType": "application/json",
+   "ms": 215
+  },
+  {
+   "id": "loc",
+   "url": "https://www.loc.gov/pictures/?fo=json&q=travel%20poster",
+   "status": 403,
+   "ok": false,
+   "contentType": "text/html",
+   "ms": 143
+  },
+  {
+   "id": "libretro-thumbnails",
+   "url": "https://thumbnails.libretro.com/Nintendo%20-%20Super%20Nintendo%20Entertainment%20System/Named_Boxarts/Super%20Mario%20World%20(USA).png",
+   "status": 200,
+   "ok": true,
+   "contentType": "image/png",
+   "ms": 625
+  },
+  {
+   "id": "vitahex",
+   "url": "https://raw.githubusercontent.com/VitaHEX-Games/hexflow-covers/main/HEXFlow-Coverlisting.txt",
+   "status": 200,
+   "ok": true,
+   "contentType": "text/plain",
+   "ms": 87
+  },
+  {
+   "id": "wikidata",
+   "url": "https://query.wikidata.org/sparql?format=json&query=SELECT%20%3Fi%20WHERE%20%7B%3Fi%20wdt%3AP31%20wd%3AQ131436%7D%20LIMIT%201",
+   "status": 200,
+   "ok": true,
+   "contentType": "application/sparql-results+json",
+   "ms": 298
+  },
+  {
+   "id": "librivox",
+   "url": "https://librivox.org/api/feed/audiobooks?format=json&limit=1",
+   "status": 200,
+   "ok": true,
+   "contentType": "application/json",
+   "ms": 785
+  },
+  {
+   "id": "apple",
+   "url": "https://itunes.apple.com/search?term=meteora&media=music&entity=album&limit=1",
+   "status": 200,
+   "ok": true,
+   "contentType": "text/javascript",
+   "ms": 75
+  },
+  {
+   "id": "deezer",
+   "url": "https://api.deezer.com/search/album?q=meteora&limit=1",
+   "status": 200,
+   "ok": true,
+   "contentType": "application/json",
+   "ms": 386
+  },
+  {
+   "id": "musicbrainz-caa",
+   "url": "https://musicbrainz.org/ws/2/release-group/?query=meteora&fmt=json&limit=1",
+   "status": 200,
+   "ok": true,
+   "contentType": "application/json",
+   "ms": 633
+  },
+  {
+   "id": "mangadex",
+   "url": "https://api.mangadex.org/manga?title=one%20piece&limit=1",
+   "status": 0,
+   "ok": false,
+   "error": "fetch failed",
+   "ms": 22333
+  },
+  {
+   "id": "jikan",
+   "url": "https://api.jikan.moe/v4/anime?q=spirited%20away&limit=1",
+   "status": 0,
+   "ok": false,
+   "error": "fetch failed",
+   "ms": 22352
+  },
+  {
+   "id": "openlibrary",
+   "url": "https://openlibrary.org/search.json?q=dune&limit=1",
+   "status": 200,
+   "ok": true,
+   "contentType": "application/json",
+   "ms": 1057
+  }
+ ],
+ "mirroredAssetRecheck": [
+  {
+   "id": "art:cleveland:143846",
+   "license": "CC0",
+   "printWidth": 2529,
+   "printHeight": 3400,
+   "matchesManifest": true
+  },
+  {
+   "id": "art:cleveland:129201",
+   "license": "CC0",
+   "printWidth": 2577,
+   "printHeight": 3400,
+   "matchesManifest": true
+  },
+  {
+   "id": "art:cleveland:127812",
+   "license": "CC0",
+   "printWidth": 1853,
+   "printHeight": 3400,
+   "matchesManifest": true
+  },
+  {
+   "id": "art:cleveland:168002",
+   "license": "CC0",
+   "printWidth": 2532,
+   "printHeight": 3400,
+   "matchesManifest": true
+  },
+  {
+   "id": "art:cleveland:153129",
+   "license": "CC0",
+   "printWidth": 2396,
+   "printHeight": 3400,
+   "matchesManifest": true
+  },
+  {
+   "id": "art:cleveland:108602",
+   "license": "CC0",
+   "printWidth": 2306,
+   "printHeight": 3400,
+   "matchesManifest": true
+  },
+  {
+   "id": "art:cleveland:95371",
+   "license": "CC0",
+   "printWidth": 1787,
+   "printHeight": 3400,
+   "matchesManifest": true
+  },
+  {
+   "id": "art:cleveland:144596",
+   "license": "CC0",
+   "printWidth": 2435,
+   "printHeight": 3400,
+   "matchesManifest": true
+  },
+  {
+   "id": "art:cleveland:143299",
+   "license": "CC0",
+   "printWidth": 2407,
+   "printHeight": 3400,
+   "matchesManifest": true
+  },
+  {
+   "id": "art:cleveland:107212",
+   "license": "CC0",
+   "printWidth": 2653,
+   "printHeight": 3400,
+   "matchesManifest": true
+  },
+  {
+   "id": "art:cleveland:107210",
+   "license": "CC0",
+   "printWidth": 2644,
+   "printHeight": 3400,
+   "matchesManifest": true
+  },
+  {
+   "id": "art:cleveland:152505",
+   "license": "CC0",
+   "printWidth": 3400,
+   "printHeight": 2315,
+   "matchesManifest": true
+  },
+  {
+   "id": "art:cleveland:118800",
+   "license": "CC0",
+   "printWidth": 3400,
+   "printHeight": 2294,
+   "matchesManifest": true
+  },
+  {
+   "id": "art:cleveland:106962",
+   "license": "CC0",
+   "printWidth": 3400,
+   "printHeight": 1681,
+   "matchesManifest": true
+  },
+  {
+   "id": "art:cleveland:120225",
+   "license": "CC0",
+   "printWidth": 2244,
+   "printHeight": 3400,
+   "matchesManifest": true
+  },
+  {
+   "id": "art:cleveland:160087",
+   "license": "CC0",
+   "printWidth": 2589,
+   "printHeight": 3400,
+   "matchesManifest": true
+  }
+ ],
+ "shards": [
+  {
+   "shard": "anime.json",
+   "platform": "anime",
+   "indexedRows": 22316,
+   "sampled": 10,
+   "ok": 10,
+   "failed": 0,
+   "failedStatuses": [],
+   "medianLongEdgePx": 317,
+   "minLongEdgePx": 225,
+   "maxLongEdgePx": 323,
+   "medianBytes": 21766,
+   "shareAtOrAbove1600px": 0
+  },
+  {
+   "shard": "games-3ds.json",
+   "platform": "3ds",
+   "indexedRows": 2148,
+   "sampled": 10,
+   "ok": 10,
+   "failed": 0,
+   "failedStatuses": [],
+   "medianLongEdgePx": 512,
+   "minLongEdgePx": 400,
+   "maxLongEdgePx": 512,
+   "medianBytes": 418128,
+   "shareAtOrAbove1600px": 0
+  },
+  {
+   "shard": "games-dreamcast.json",
+   "platform": "dreamcast",
+   "indexedRows": 1332,
+   "sampled": 10,
+   "ok": 10,
+   "failed": 0,
+   "failedStatuses": [],
+   "medianLongEdgePx": 512,
+   "minLongEdgePx": 512,
+   "maxLongEdgePx": 512,
+   "medianBytes": 493617,
+   "shareAtOrAbove1600px": 0
+  },
+  {
+   "shard": "games-gb.json",
+   "platform": "gb",
+   "indexedRows": 1647,
+   "sampled": 10,
+   "ok": 10,
+   "failed": 0,
+   "failedStatuses": [],
+   "medianLongEdgePx": 512,
+   "minLongEdgePx": 256,
+   "maxLongEdgePx": 645,
+   "medianBytes": 301545,
+   "shareAtOrAbove1600px": 0
+  },
+  {
+   "shard": "games-gba.json",
+   "platform": "gba",
+   "indexedRows": 5961,
+   "sampled": 10,
+   "ok": 10,
+   "failed": 0,
+   "failedStatuses": [],
+   "medianLongEdgePx": 512,
+   "minLongEdgePx": 256,
+   "maxLongEdgePx": 864,
+   "medianBytes": 479992,
+   "shareAtOrAbove1600px": 0
+  },
+  {
+   "shard": "games-gbc.json",
+   "platform": "gbc",
+   "indexedRows": 1524,
+   "sampled": 10,
+   "ok": 10,
+   "failed": 0,
+   "failedStatuses": [],
+   "medianLongEdgePx": 512,
+   "minLongEdgePx": 256,
+   "maxLongEdgePx": 650,
+   "medianBytes": 466321,
+   "shareAtOrAbove1600px": 0
+  },
+  {
+   "shard": "games-gc.json",
+   "platform": "gc",
+   "indexedRows": 1954,
+   "sampled": 10,
+   "ok": 10,
+   "failed": 0,
+   "failedStatuses": [],
+   "medianLongEdgePx": 699,
+   "minLongEdgePx": 672,
+   "maxLongEdgePx": 731,
+   "medianBytes": 584314,
+   "shareAtOrAbove1600px": 0
+  },
+  {
+   "shard": "games-genesis.json",
+   "platform": "genesis",
+   "indexedRows": 2352,
+   "sampled": 10,
+   "ok": 10,
+   "failed": 0,
+   "failedStatuses": [],
+   "medianLongEdgePx": 680,
+   "minLongEdgePx": 354,
+   "maxLongEdgePx": 731,
+   "medianBytes": 628733,
+   "shareAtOrAbove1600px": 0
+  },
+  {
+   "shard": "games-n64.json",
+   "platform": "n64",
+   "indexedRows": 1115,
+   "sampled": 10,
+   "ok": 10,
+   "failed": 0,
+   "failedStatuses": [],
+   "medianLongEdgePx": 512,
+   "minLongEdgePx": 493,
+   "maxLongEdgePx": 716,
+   "medianBytes": 384693,
+   "shareAtOrAbove1600px": 0
+  },
+  {
+   "shard": "games-nds.json",
+   "platform": "nds",
+   "indexedRows": 7335,
+   "sampled": 10,
+   "ok": 10,
+   "failed": 0,
+   "failedStatuses": [],
+   "medianLongEdgePx": 512,
+   "minLongEdgePx": 500,
+   "maxLongEdgePx": 514,
+   "medianBytes": 322247,
+   "shareAtOrAbove1600px": 0
+  },
+  {
+   "shard": "games-nes.json",
+   "platform": "nes",
+   "indexedRows": 13439,
+   "sampled": 10,
+   "ok": 10,
+   "failed": 0,
+   "failedStatuses": [],
+   "medianLongEdgePx": 680,
+   "minLongEdgePx": 350,
+   "maxLongEdgePx": 745,
+   "medianBytes": 358134,
+   "shareAtOrAbove1600px": 0
+  },
+  {
+   "shard": "games-ps1.json",
+   "platform": "ps1",
+   "indexedRows": 9301,
+   "sampled": 10,
+   "ok": 10,
+   "failed": 0,
+   "failedStatuses": [],
+   "medianLongEdgePx": 512,
+   "minLongEdgePx": 512,
+   "maxLongEdgePx": 522,
+   "medianBytes": 396868,
+   "shareAtOrAbove1600px": 0,
+   "serials": {
+    "sampled": 10,
+    "ok": 10,
+    "failed": 0,
+    "failedStatuses": [],
+    "medianLongEdgePx": 500,
+    "minLongEdgePx": 500,
+    "maxLongEdgePx": 500,
+    "medianBytes": 55281,
+    "shareAtOrAbove1600px": 0
+   }
+  },
+  {
+   "shard": "games-ps2.json",
+   "platform": "ps2",
+   "indexedRows": 8502,
+   "sampled": 10,
+   "ok": 10,
+   "failed": 0,
+   "failedStatuses": [],
+   "medianLongEdgePx": 680,
+   "minLongEdgePx": 680,
+   "maxLongEdgePx": 733,
+   "medianBytes": 581243,
+   "shareAtOrAbove1600px": 0,
+   "serials": {
+    "sampled": 10,
+    "ok": 10,
+    "failed": 0,
+    "failedStatuses": [],
+    "medianLongEdgePx": 736,
+    "minLongEdgePx": 736,
+    "maxLongEdgePx": 736,
+    "medianBytes": 114553,
+    "shareAtOrAbove1600px": 0
+   }
+  },
+  {
+   "shard": "games-psp.json",
+   "platform": "psp",
+   "indexedRows": 1774,
+   "sampled": 10,
+   "ok": 10,
+   "failed": 0,
+   "failedStatuses": [],
+   "medianLongEdgePx": 878,
+   "minLongEdgePx": 498,
+   "maxLongEdgePx": 885,
+   "medianBytes": 651061,
+   "shareAtOrAbove1600px": 0
+  },
+  {
+   "shard": "games-psvita.json",
+   "platform": "psvita",
+   "indexedRows": 100,
+   "sampled": 10,
+   "ok": 10,
+   "failed": 0,
+   "failedStatuses": [],
+   "medianLongEdgePx": 320,
+   "minLongEdgePx": 320,
+   "maxLongEdgePx": 320,
+   "medianBytes": 46241,
+   "shareAtOrAbove1600px": 0
+  },
+  {
+   "shard": "games-saturn.json",
+   "platform": "saturn",
+   "indexedRows": 2294,
+   "sampled": 10,
+   "ok": 10,
+   "failed": 0,
+   "failedStatuses": [],
+   "medianLongEdgePx": 512,
+   "minLongEdgePx": 512,
+   "maxLongEdgePx": 863,
+   "medianBytes": 546469,
+   "shareAtOrAbove1600px": 0
+  },
+  {
+   "shard": "games-snes.json",
+   "platform": "snes",
+   "indexedRows": 3692,
+   "sampled": 10,
+   "ok": 10,
+   "failed": 0,
+   "failedStatuses": [],
+   "medianLongEdgePx": 909,
+   "minLongEdgePx": 512,
+   "maxLongEdgePx": 941,
+   "medianBytes": 451047,
+   "shareAtOrAbove1600px": 0
+  },
+  {
+   "shard": "games-wii.json",
+   "platform": "wii",
+   "indexedRows": 6668,
+   "sampled": 10,
+   "ok": 10,
+   "failed": 0,
+   "failedStatuses": [],
+   "medianLongEdgePx": 680,
+   "minLongEdgePx": 680,
+   "maxLongEdgePx": 735,
+   "medianBytes": 656420,
+   "shareAtOrAbove1600px": 0
+  }
+ ]
+}

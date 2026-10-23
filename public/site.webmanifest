@@ -1,0 +1,15 @@
+{
+  "name": "Rupa — Visual Library",
+  "short_name": "Rupa",
+  "description": "Find visual art, browse editions, and keep collections with their sources.",
+  "start_url": "/rupa/",
+  "scope": "/rupa/",
+  "display": "standalone",
+  "background_color": "#f3f0e8",
+  "theme_color": "#f3f0e8",
+  "icons": [
+    { "src": "/rupa/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/rupa/pwa-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/rupa/pwa-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

@@ -1,0 +1,33 @@
+name: Refresh Apple chart snapshot
+on:
+  schedule:
+    - cron: '17 0,6,12,18 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: apple-trends-refresh
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main }
+      - uses: actions/setup-node@v4
+        with: { node-version: '22' }
+      - run: npm run refresh:apple-trends
+      - name: Publish changed snapshot and deploy Pages
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if git diff --quiet -- public/data/apple-trends.json; then echo "No chart changes."; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/apple-trends.json
+          git commit -m "Refresh Apple chart snapshot"
+          git fetch origin main
+          git rebase origin/main
+          git push origin HEAD:main
+          gh workflow run deploy-pages.yml --ref main

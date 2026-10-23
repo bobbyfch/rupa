@@ -1,0 +1,22 @@
+{
+  "note": "Archives RUPA links to and never copies from (docs/RUPA_SOURCE_MAP.md section G.5). Each is named, linked and credited; takedown and rights questions go to the archive itself.",
+  "archives": [
+    { "name": "IMP Awards", "url": "https://www.impawards.com/", "categories": ["movies"], "about": "Film posters by year" },
+    { "name": "Posteritati", "url": "https://posteritati.com/", "categories": ["movies", "physicalmedia"], "about": "Vintage and international film posters" },
+    { "name": "National Film Archive of Japan", "url": "https://www.nfaj.go.jp/", "categories": ["movies"], "about": "Japanese film archive" },
+    { "name": "Korean Movie Database", "url": "https://www.kmdb.or.kr/eng/main", "categories": ["movies"], "about": "Korean film posters and records" },
+    { "name": "Taiwan Film and Audiovisual Institute", "url": "https://www.tfai.org.tw/", "categories": ["movies"], "about": "Taiwanese film archive" },
+    { "name": "Indonesian Film Poster Archive (Flickr)", "url": "https://www.flickr.com/photos/indonesianfilmposterarchive/", "categories": ["movies"], "about": "Indonesian film posters" },
+    { "name": "The Poster DB", "url": "https://theposterdb.com/", "categories": ["movies", "tv"], "about": "Fan poster sets" },
+    { "name": "MediUX", "url": "https://mediux.pro/", "categories": ["movies", "tv"], "about": "Fan poster sets" },
+    { "name": "Movie Poster DB", "url": "https://movieposterdb.com/", "categories": ["movies"], "about": "Poster listings" },
+    { "name": "The Cover Project", "url": "https://www.thecoverproject.net/", "categories": ["games"], "about": "Game cover scans" },
+    { "name": "LaunchBox Games Database", "url": "https://gamesdb.launchbox-app.com/", "categories": ["games"], "about": "Game images and metadata" },
+    { "name": "MobyGames", "url": "https://www.mobygames.com/", "categories": ["games"], "about": "Game credits and cover art" },
+    { "name": "MangaDex", "url": "https://mangadex.org/", "categories": ["manga", "webtoons"], "about": "Per-volume and per-language manga covers" },
+    { "name": "Grand Comics Database", "url": "https://www.comics.org/", "categories": ["comics"], "about": "Issue and variant covers" },
+    { "name": "MusicBrainz", "url": "https://musicbrainz.org/", "categories": ["music"], "about": "Release editions" },
+    { "name": "Cover Art Archive", "url": "https://coverartarchive.org/", "categories": ["music"], "about": "Release cover scans, front and back" },
+    { "name": "NASA/JPL Visions of the Future", "url": "https://www.jpl.nasa.gov/galleries/visions-of-the-future/", "categories": ["art"], "about": "Exoplanet and Solar System travel posters (read the JPL image policy before reuse)" }
+  ]
+}
