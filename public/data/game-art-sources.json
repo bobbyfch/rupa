@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 2,
+  "catalogs": [
+    {
+      "id": "classic-console-indexes",
+      "name": "Classic console indexes",
+      "group": "Platform libraries",
+      "description": "Searchable title and remote box-art references across 17 classic console feeds. Each platform points to its own source index.",
+      "mode": "Indexed by platform; image URLs stay on their original hosts",
+      "url": "https://github.com/libretro-thumbnails",
+      "assets": ["Box art", "Title records"],
+      "platforms": ["3ds", "dreamcast", "gb", "gba", "gbc", "gc", "genesis", "n64", "nds", "nes", "ps1", "ps2", "psp", "psvita", "saturn", "snes", "wii"]
+    },
+    {
+      "id": "steam-store",
+      "name": "Steam Store",
+      "group": "Modern catalogs",
+      "description": "A refreshed top-seller snapshot plus title-specific store records, including header art, gameplay screenshots, and store backgrounds.",
+      "mode": "Scheduled snapshot; the app reads published metadata and image URLs",
+      "url": "https://store.steampowered.com/charts/topselling/",
+      "assets": ["Store art", "Gameplay screenshots", "Wallpapers"],
+      "platforms": ["pc"]
+    },
+    {
+      "id": "wikidata-commons",
+      "name": "Wikidata + Wikimedia Commons",
+      "group": "Modern catalogs",
+      "description": "Searches game records and Commons files for modern-console platform links, covers, logos, gameplay images, icons, title screens, and wallpapers.",
+      "mode": "Live title search; every result keeps its record or file page",
+      "url": "https://www.wikidata.org/",
+      "assets": ["Covers", "Screenshots", "Logos", "Icons", "Title screens", "Wallpapers"],
+      "platforms": ["ps4", "ps5", "switch", "xbox-one", "xbox-series", "pc"]
+    },
+    {
+      "id": "publisher-press",
+      "name": "Publisher press pages",
+      "group": "Title-specific feeds",
+      "description": "Publisher pages can be added per game to the same index. Configured feeds are parsed into original and preview URLs; current automated press-page coverage is listed below.",
+      "mode": "Per-title adapter; no UI rewrite when another compatible page is added",
+      "url": "https://press.cdprojektred.com/en/224/808",
+      "assets": ["Press images", "Key art", "Screenshots", "Logos"],
+      "platforms": ["pc"]
+    },
+    {
+      "id": "steamgriddb",
+      "name": "SteamGridDB",
+      "group": "Community catalogs",
+      "description": "External per-title search for grids, heroes, logos, and icons. Results open on the original catalog and are not copied into Rupa.",
+      "mode": "Linked search",
+      "urlTemplate": "https://www.steamgriddb.com/search/grids?term={query}",
+      "assets": ["Grids", "Heroes", "Logos", "Icons"],
+      "platforms": ["pc"]
+    },
+    {
+      "id": "launchbox",
+      "name": "LaunchBox Games Database",
+      "group": "Community catalogs",
+      "description": "External title search for game metadata and image editions across systems.",
+      "mode": "Linked search",
+      "urlTemplate": "https://gamesdb.launchbox-app.com/games/results?id={query}",
+      "assets": ["Covers", "Screenshots", "Logos", "Clear logos"],
+      "platforms": ["classic", "modern"]
+    },
+    {
+      "id": "cover-project",
+      "name": "The Cover Project",
+      "group": "Community catalogs",
+      "description": "Community cover scans for console games, linked as an external reference catalog.",
+      "mode": "Catalog link",
+      "url": "https://www.thecoverproject.net/",
+      "assets": ["Box art"],
+      "platforms": ["classic"]
+    },
+    {
+      "id": "reddit-search",
+      "name": "Reddit search",
+      "group": "Community discovery",
+      "description": "Title-specific community search. Rupa links to the results page; it does not scrape login-gated posts.",
+      "mode": "Linked search",
+      "urlTemplate": "https://www.reddit.com/search/?q={query}",
+      "assets": ["Community references"],
+      "platforms": ["classic", "modern"]
+    },
+    {
+      "id": "imgur-search",
+      "name": "Imgur search",
+      "group": "Community discovery",
+      "description": "Title-specific community search; image pages remain hosted by Imgur.",
+      "mode": "Linked search",
+      "urlTemplate": "https://imgur.com/search?q={query}",
+      "assets": ["Community images"],
+      "platforms": ["classic", "modern"]
+    }
+  ],
+  "entries": [
+    {
+      "matches": ["Cyberpunk 2077"],
+      "sources": [
+        { "label": "CD PROJEKT RED media", "kind": "Official press assets", "url": "https://press.cdprojektred.com/en/224/808" },
+        { "label": "Cyberpunk official site", "kind": "Publisher site", "url": "https://www.cyberpunk.net" },
+        { "label": "Reddit community search", "kind": "Community references", "url": "https://www.reddit.com/r/cyberpunkgame/search/?q=Cyberpunk%202077%20wallpaper&restrict_sr=1&sort=top&t=all" },
+        { "label": "Imgur community search", "kind": "Community albums", "url": "https://imgur.com/search?q=Cyberpunk%202077%20wallpaper" }
+      ]
+    }
+  ]
+}

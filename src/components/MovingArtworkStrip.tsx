@@ -75,9 +75,9 @@ export function MovingArtworkStrip() {
 
   const keepLoaded = (id: string) => setItems(current => current.filter(item => item.id !== id));
   const lanes = [items.slice(0, 6), items.slice(6, 12), items.slice(12, 18)];
-  const renderItem = (item: GalleryItem, duplicate = false) => (
+  const renderItem = (item: GalleryItem, duplicate = false, prioritize = false) => (
     <a className="art-strip-card" href={item.href} target="_blank" rel="noreferrer" key={(duplicate ? 'copy:' : '') + item.id} tabIndex={duplicate ? -1 : undefined} aria-label={`${item.title} · ${item.source}`}>
-      <img src={item.image} alt="" loading="lazy" decoding="async" onError={() => { if (!duplicate) keepLoaded(item.id); }}/>
+      <img src={item.image} alt="" loading={prioritize && !duplicate ? 'eager' : 'lazy'} fetchPriority={prioritize && !duplicate ? 'high' : 'auto'} decoding="async" onLoad={event => event.currentTarget.parentElement?.classList.add('image-ready')} onError={() => { if (!duplicate) keepLoaded(item.id); }}/>
       <span className="art-strip-caption"><strong>{item.title}</strong><small>{item.source}</small></span>
     </a>
   );
@@ -88,7 +88,7 @@ export function MovingArtworkStrip() {
   return <section className={'moving-artwork-strip' + (paused ? ' is-paused' : '')} aria-label="A moving selection from the Rupa image archive">
     <div className="art-strip-heading"><span className="tiny-kicker">ON VIEW / SELECTED IMAGES</span><button type="button" onClick={() => setPaused(value => !value)} aria-label={paused ? 'Play moving artwork' : 'Pause moving artwork'}>{paused ? <Play size={14} fill="currentColor"/> : <Pause size={14} fill="currentColor"/>}<span>{paused ? 'Play' : 'Pause'}</span></button></div>
     <div className="art-strip-collage">{lanes.map((lane, index) => <div className={`art-strip-lane lane-${index + 1}`} key={index}>
-      {[lane, lane].map((group, repeatIndex) => <div className="art-strip-track" key={`${index}-${repeatIndex}`} aria-hidden={repeatIndex === 1}>{group.map(item => renderItem(item, repeatIndex === 1))}</div>)}
+      {[lane, lane].map((group, repeatIndex) => <div className="art-strip-track" key={`${index}-${repeatIndex}`} aria-hidden={repeatIndex === 1}>{group.map((item,itemIndex) => renderItem(item,repeatIndex === 1,itemIndex<3))}</div>)}
     </div>)}</div>
   </section>;
 }

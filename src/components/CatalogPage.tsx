@@ -140,8 +140,8 @@ export default function CatalogPage({ initialQuery, profileId, notify, onOpen, o
   // The 2.6 MB audiobook index arrives last, so it renders last and pushes nothing above it.
   const audiobookTitles = titleHits.filter(hit => hit.work.category === 'audiobooks');
   return <section className="content-width search-content catalog-page">
-    <div className="listing-header"><div className="tiny-kicker">RUPA / ARTWORK CATALOG</div><h1>Artwork catalog.</h1>
-      <p>Search works across film, games, books, and visual archives. Explore indexed editions, find matching artwork, and open each result at its source.</p></div>
+    <div className="listing-header"><div className="tiny-kicker">RUPA / WORK INDEX</div><h1>Work index.</h1>
+      <p>Search local records for works and editions. For console coverage and game-image sources, open the dedicated Game source index.</p></div>
     <form className="search-bar" onSubmit={submit}><Search size={21} /><input aria-label="Search artwork catalog" value={query} onChange={e => setQuery(e.target.value)} placeholder="Spirited Away, Final Fantasy X PS2, Toulouse-Lautrec…" /><Button type="submit">Search <ArrowRight size={16} /></Button></form>
     <div className="cat-filters" role="group" aria-label="Collection filter">{FILTERS.map(f => <button key={f.id} className={filter === f.id ? 'active' : ''} aria-pressed={filter === f.id} onClick={() => { setFilter(f.id); commit(submitted, f.id); }}>{f.label}</button>)}</div>
     <p className="cat-status" role="status">{error || (busy ? 'Searching offline indexes…' : totals ? `${totals.works.toLocaleString('en-US')} works · ${totals.games} game platforms · ${totals.titles.toLocaleString('en-US')} indexed titles · searchable offline` : 'Loading offline index…')}</p>

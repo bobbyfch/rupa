@@ -4,7 +4,7 @@ import { ArrowRight, ArrowUpRight, Gamepad2, LoaderCircle } from 'lucide-react';
 type TrendingGame = { rank: number; appId: number; title: string; image: string; sourceUrl: string; source: string };
 type Snapshot = { generatedAt?: string; sourceUrl?: string; items?: TrendingGame[] };
 
-export function GameTrendingPanel({ onSelect }: { onSelect: (title: string) => void }) {
+export function GameTrendingPanel({ onSelect }: { onSelect: (game: TrendingGame) => void }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [failed, setFailed] = useState<Set<number>>(() => new Set());
   const [loading, setLoading] = useState(true);
@@ -23,7 +23,7 @@ export function GameTrendingPanel({ onSelect }: { onSelect: (title: string) => v
   const updated = snapshot?.generatedAt ? new Date(snapshot.generatedAt).toLocaleDateString('en', { year: 'numeric', month: 'short', day: 'numeric' }) : '';
   return <section className="game-trending-section" aria-labelledby="game-trending-title">
     <div className="game-trending-heading"><div><span className="tiny-kicker">STEAM / US TOP SELLERS</span><h2 id="game-trending-title">Top sellers</h2><p>Choose a game to find editions and artwork in the archive.</p></div><div>{updated&&<small>Snapshot · {updated}</small>}<a href={snapshot?.sourceUrl || 'https://store.steampowered.com/charts/topselling/'} target="_blank" rel="noreferrer">Steam chart <ArrowUpRight size={13}/></a></div></div>
-    <div className="game-trending-grid">{games.slice(0, 20).map(game => <article className="game-trending-card" key={game.appId}><button type="button" onClick={() => onSelect(game.title)} aria-label={`Search indexed artwork for ${game.title}`}>{failed.has(game.appId) ? <span className="game-trending-fallback"><Gamepad2 size={22}/></span> : <img src={game.image} alt={`${game.title} cover artwork`} loading="lazy" decoding="async" onError={() => setFailed(current => new Set(current).add(game.appId))}/>}<span className="game-trending-rank">{String(game.rank).padStart(2, '0')}</span><span className="game-trending-title">{game.title}</span><span className="game-trending-action">Search archive <ArrowRight size={13}/></span></button><a href={game.sourceUrl} target="_blank" rel="noreferrer">Steam store page <ArrowUpRight size={12}/></a></article>)}</div>
+    <div className="game-trending-grid">{games.slice(0, 20).map(game => <article className="game-trending-card" key={game.appId}><button type="button" onClick={() => onSelect(game)} aria-label={`Open ${game.title} artwork`}>{failed.has(game.appId) ? <span className="game-trending-fallback"><Gamepad2 size={22}/></span> : <img src={game.image} alt={`${game.title} cover artwork`} loading="lazy" decoding="async" onError={() => setFailed(current => new Set(current).add(game.appId))}/>}<span className="game-trending-rank">{String(game.rank).padStart(2, '0')}</span><span className="game-trending-title">{game.title}</span><span className="game-trending-action">Open artwork <ArrowRight size={13}/></span></button><a href={game.sourceUrl} target="_blank" rel="noreferrer">Steam store page <ArrowUpRight size={12}/></a></article>)}</div>
     <p className="game-trending-note">Game names and cover images link to their Steam store pages.</p>
   </section>;
 }

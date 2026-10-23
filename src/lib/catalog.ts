@@ -42,7 +42,7 @@ export interface WikidataShard {
 export interface AudiobookShard { urlBase: string; rows: [number, string, string, string, number, string][] }
 export interface IndexManifest {
   schemaVersion: number; generatedAt: string;
-  shards: { id: string; kind: 'works' | 'games' | 'anime' | 'wikidata' | 'audiobooks'; category?: string; platform?: string; label?: string; file: string; rows: number; bytes: number }[];
+  shards: { id: string; kind: 'works' | 'games' | 'anime' | 'wikidata' | 'audiobooks'; category?: string; platform?: string; label?: string; file: string; rows: number; bytes: number; sourceId?: string; sourceRepo?: string; sourceUrl?: string; revision?: string; rights?: string }[];
 }
 
 // ---------- text matching ----------
@@ -112,7 +112,7 @@ const cache = new Map<string, Promise<unknown>>();
 function loadJson<T>(file: string, signal?: AbortSignal): Promise<T> {
   let promise = cache.get(file) as Promise<T> | undefined;
   if (!promise) {
-    promise = fetch(indexUrl(file), { headers: { Accept: 'application/json' }, cache: 'force-cache' })
+    promise = fetch(indexUrl(file), { headers: { Accept: 'application/json' }, cache: file === 'games-steam.json' ? 'no-cache' : 'force-cache' })
       .then(response => { if (!response.ok) throw new Error(`Offline index ${file}: HTTP ${response.status}`); return response.json() as Promise<T>; });
     promise.catch(() => cache.delete(file));
     cache.set(file, promise);
@@ -239,7 +239,7 @@ export function loadLocalCovers(): Promise<LocalCovers> {
   return localCovers;
 }
 export const resetLocalCovers = () => { localCovers = null; };
-export type GameAssetFilter = 'covers' | 'screenshots' | 'logos' | 'icons' | 'title-screens' | 'all';
+export type GameAssetFilter = 'covers' | 'screenshots' | 'wallpapers' | 'artworks' | 'logos' | 'icons' | 'title-screens' | 'all';
 export function gameArtworks(shard: GameShard, query: string, limit = 48, local: LocalCovers = {}, assetFilter: GameAssetFilter = 'covers'): Artwork[] {
   const { tokens, platforms } = parseQuery(query);
   if (platforms.size && !platforms.has(shard.platform)) return [];
@@ -301,7 +301,7 @@ export function gameArtworks(shard: GameShard, query: string, limit = 48, local:
       ];
       for (const asset of assets) {
         if (!(flags & asset.flag)) continue;
-        const filterByFlag: Record<GameAssetFilter, number[]> = { covers: [1], screenshots: [4], logos: [2], icons: [], 'title-screens': [8], all: [1, 2, 4, 8] };
+        const filterByFlag: Record<GameAssetFilter, number[]> = { covers: [1], screenshots: [4], logos: [2], icons: [], 'title-screens': [8], wallpapers: [], artworks: [], all: [1, 2, 4, 8] };
         if (!filterByFlag[assetFilter].includes(asset.flag)) continue;
         const isLocal = asset.flag === 1 && Boolean(local[shard.platform]?.boxart.includes(file));
         const url = isLocal ? `${LOCAL_COVER_ROOT}${shard.platform}/boxart/${file}` : `${shard.imageBase}${asset.folder}/${file}`;
@@ -439,6 +439,36 @@ export async function searchModernGameIndex(query: string, platform = 'all', ass
   if (term.length < 2) return [];
   const platformIds: string[] = platform === 'all' ? MODERN_GAME_PLATFORMS.map(item => item.qid) : MODERN_GAME_PLATFORMS.filter(item => item.id === platform).map(item => item.qid);
   const out: Artwork[] = [];
+  type SteamIndex = { games?: { appId: number; title: string; sourceUrl: string; assets: { id: string; kind: Artwork['kind']; label: string; image: string; preview?: string; sourceUrl?: string; source?: string; provider?: string; platform?: string }[] }[] };
+  const steamIndex = await loadJson<SteamIndex>('games-steam.json', signal).catch(error => { if (signal?.aborted) throw error; return null; });
+  const normalizedTerm = normalizeText(term);
+  if (steamIndex?.games) {
+    const platformAliases: Record<string, string[]> = {
+      pc: ['PC', 'All platforms'],
+      ps4: ['PlayStation 4', 'All platforms'],
+      ps5: ['PlayStation 5', 'All platforms'],
+      switch: ['Nintendo Switch', 'Nintendo Switch 2', 'All platforms'],
+      'xbox-one': ['Xbox One', 'Xbox', 'All platforms'],
+      'xbox-series': ['Xbox Series X/S', 'Xbox', 'All platforms'],
+    };
+    const acceptedKinds: Record<GameAssetFilter, string[] | null> = {
+      covers: ['cover'], screenshots: ['screenshot'], wallpapers: ['wallpaper'], artworks: ['promo-art', 'key-art'], logos: ['logo'], icons: ['icon'], 'title-screens': ['title-screen'], all: null,
+    };
+    for (const game of steamIndex.games) {
+      const normalizedTitle = normalizeText(game.title);
+      if (!normalizedTitle.includes(normalizedTerm) && !normalizedTerm.includes(normalizedTitle)) continue;
+      for (const asset of game.assets || []) {
+        if (acceptedKinds[assetFilter] && !acceptedKinds[assetFilter]!.includes(asset.kind || '')) continue;
+        if (platform !== 'all' && !(platformAliases[platform] || []).includes(asset.platform || 'PC')) continue;
+        out.push({
+          id: asset.id, category: 'games', title: game.title, subtitle: `${asset.platform || 'PC'} · ${asset.label}`, source: asset.source || 'Steam Store', provider: asset.provider || 'Steam Store API', sourceUrl: asset.sourceUrl || game.sourceUrl,
+          previewUrl: asset.preview || asset.image, imageUrl: asset.image, downloadUrl: asset.image, hdDownloadUrls: [asset.image], kind: asset.kind,
+          rights: 'source-only', mediaId: String(game.appId), editionId: `steam:${game.appId}`, availability: 'index-only',
+        });
+      }
+    }
+  }
+  if (out.length) return out;
   try {
     const searchParams = new URLSearchParams({ action: 'wbsearchentities', search: term, language: 'en', uselang: 'en', limit: '20', format: 'json', origin: '*' });
     const response = await fetch('https://www.wikidata.org/w/api.php?' + searchParams, { signal, headers: { Accept: 'application/json' } });
@@ -481,19 +511,25 @@ export async function searchModernGameIndex(query: string, platform = 'all', ass
     { filter: 'logos', suffix: ' video game logo', kind: 'logo', label: 'Game logo' },
     { filter: 'icons', suffix: ' video game icon', kind: 'icon', label: 'Game icon' },
     { filter: 'title-screens', suffix: ' video game title screen', kind: 'title-screen', label: 'Title screen' },
+    { filter: 'wallpapers', suffix: ' video game wallpaper', kind: 'wallpaper', label: 'Wallpaper' },
   ];
   const commonsWanted = assetFilter === 'all' ? commonsTypes : commonsTypes.filter(item => item.filter === assetFilter);
   const commonsResults = await Promise.all(commonsWanted.map(async asset => {
     const params = new URLSearchParams({ action: 'query', generator: 'search', gsrsearch: term + asset.suffix, gsrnamespace: '6', gsrlimit: '8', prop: 'imageinfo', iiprop: 'url', iiurlwidth: '960', format: 'json', origin: '*' });
-    const response = await fetch('https://commons.wikimedia.org/w/api.php?' + params, { signal, headers: { Accept: 'application/json' } });
-    if (!response.ok) return [];
-    const data = await response.json();
-    const pages = Object.values(data.query?.pages || {}) as { title: string; imageinfo?: { thumburl?: string; url?: string }[] }[];
-    return pages.flatMap(page => {
-      const url = page.imageinfo?.[0]?.thumburl || page.imageinfo?.[0]?.url;
-      if (!url) return [];
-      return [{ id: 'games:commons:' + encodeURIComponent(page.title), category: 'games' as const, title: term, subtitle: [MODERN_GAME_PLATFORMS.find(item => item.id === platform)?.label || 'Modern consoles', asset.label, page.title.replace(/^File:/, '')].join(' · '), source: 'Wikimedia Commons', provider: 'Wikimedia Commons', sourceUrl: 'https://commons.wikimedia.org/wiki/' + encodeURIComponent(page.title.replaceAll(' ', '_')), previewUrl: url, imageUrl: url, downloadUrl: url, kind: asset.kind, rights: 'source-only' as const, mediaId: page.title, editionId: 'commons:' + term, availability: 'index-only' as const }];
-    });
+    try {
+      const response = await fetch('https://commons.wikimedia.org/w/api.php?' + params, { signal, headers: { Accept: 'application/json' } });
+      if (!response.ok) return [];
+      const data = await response.json();
+      const pages = Object.values(data.query?.pages || {}) as { title: string; imageinfo?: { thumburl?: string; url?: string }[] }[];
+      return pages.flatMap(page => {
+        const url = page.imageinfo?.[0]?.thumburl || page.imageinfo?.[0]?.url;
+        if (!url) return [];
+        return [{ id: 'games:commons:' + encodeURIComponent(page.title), category: 'games' as const, title: term, subtitle: ['Platform unverified', asset.label, page.title.replace(/^File:/, '')].join(' · '), source: 'Wikimedia Commons', provider: 'Wikimedia Commons', sourceUrl: 'https://commons.wikimedia.org/wiki/' + encodeURIComponent(page.title.replaceAll(' ', '_')), previewUrl: url, imageUrl: url, downloadUrl: url, kind: asset.kind, rights: 'source-only' as const, mediaId: page.title, editionId: 'commons:' + term, availability: 'index-only' as const }];
+      });
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      return [];
+    }
   }));
   out.push(...commonsResults.flat());
   return out;

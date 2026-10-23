@@ -9,7 +9,7 @@ import { Button } from './ui/button';
 const CATEGORIES: { id: AppleCategory; label: string }[] = [
   { id: 'music', label: 'Music' },
   { id: 'musicvideos', label: 'Music videos' },
-  { id: 'movies', label: 'Movies' },
+  { id: 'movies', label: 'Film' },
   { id: 'tv', label: 'TV' },
   { id: 'books', label: 'Books' },
   { id: 'audiobooks', label: 'Audiobooks' },
@@ -31,12 +31,22 @@ const CHARTS: Partial<Record<AppleCategory, { id: AppleChartKind; label: string 
 function AppleTrendImage({ item }: { item: Artwork }) {
   const sources = useMemo(() => [...new Set([item.previewUrl, item.imageUrl, item.downloadUrl, ...(item.hdDownloadUrls || [])].filter((url): url is string => Boolean(url)))], [item.id, item.previewUrl, item.imageUrl, item.downloadUrl, item.hdDownloadUrls]);
   const [sourceIndex, setSourceIndex] = useState(0);
-  useEffect(() => setSourceIndex(0), [item.id, sources]);
+  const [imageStatus, setImageStatus] = useState<'loading'|'ready'|'failed'>(sources.length ? 'loading' : 'failed');
+  useEffect(() => { setSourceIndex(0); setImageStatus(sources.length ? 'loading' : 'failed'); }, [item.id, sources]);
   const source = sources[sourceIndex];
-  return source ? <img src={source} alt={`${item.title} artwork`} loading="lazy" decoding="async" onError={() => setSourceIndex(index => index + 1)}/> : <span className="apple-trend-art-missing" role="img" aria-label={`${item.title} artwork unavailable`}><ImageIcon size={20}/><small>Artwork unavailable</small></span>;
+  const failSource = () => {
+    const next = sourceIndex + 1;
+    if (next < sources.length) { setSourceIndex(next); setImageStatus('loading'); }
+    else setImageStatus('failed');
+  };
+  return <span className="apple-trend-image" aria-busy={imageStatus === 'loading'}>
+    {imageStatus === 'loading' && <span className="apple-trend-image-skeleton" role="status" aria-label={`Loading ${item.title} cover`}><LoaderCircle size={19} className="rupa-spinner"/></span>}
+    {source ? <img className={imageStatus === 'ready' ? 'is-ready' : ''} src={source} alt={`${item.title} artwork`} loading="lazy" decoding="async" onLoad={() => setImageStatus('ready')} onError={failSource}/> : <span className="apple-trend-art-missing" role="img" aria-label={`${item.title} artwork unavailable`}><ImageIcon size={20}/><small>Artwork unavailable</small></span>}
+  </span>;
 }
 
-export function AppleTrendTool({ storefront, onStorefrontChange, onSearch, onOpen, onFavorite, favoriteIds }: {
+export function AppleTrendTool({ initialCategory = 'music', storefront, onStorefrontChange, onSearch, onOpen, onFavorite, favoriteIds }: {
+  initialCategory?: AppleCategory;
   storefront: AppleStorefront;
   onStorefrontChange: (value: AppleStorefront) => void;
   onSearch: (category: AppleCategory, query: string) => void;
@@ -44,7 +54,7 @@ export function AppleTrendTool({ storefront, onStorefrontChange, onSearch, onOpe
   onFavorite: (item: Artwork) => void;
   favoriteIds: Set<string>;
 }) {
-  const [category, setCategory] = useState<AppleCategory>('music');
+  const [category] = useState<AppleCategory>(initialCategory);
   const [chart, setChart] = useState<AppleChartKind>('albums');
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<Artwork[]>([]);
@@ -56,10 +66,10 @@ export function AppleTrendTool({ storefront, onStorefrontChange, onSearch, onOpe
   const chartOptions = CHARTS[category] || [];
   const activeChart = chartOptions.find(option => option.id === chart)?.id || chartOptions[0]?.id;
   const chartLabel = useMemo(() => chartOptions.find(option => option.id === activeChart)?.label || '', [activeChart, chartOptions]);
-  const categoryLabel = CATEGORIES.find(option => option.id === category)?.label || 'Apple';
-  const visibleItems = useMemo(() => order === 'newest' && category === 'music'
+  const categoryLabel = CATEGORIES.find(option => option.id === category)?.label || 'Catalog';
+  const visibleItems = useMemo(() => order === 'newest'
     ? [...items].sort((a, b) => (b.releaseDate || '').localeCompare(a.releaseDate || ''))
-    : items, [items, order, category]);
+    : items, [items, order]);
   const storefrontOptions = availableStorefronts.length
     ? APPLE_STOREFRONTS.filter(option => availableStorefronts.includes(option.id))
     : APPLE_STOREFRONTS;
@@ -92,32 +102,23 @@ export function AppleTrendTool({ storefront, onStorefrontChange, onSearch, onOpe
     return () => controller.abort();
   }, [activeChart, category, onStorefrontChange, storefront]);
 
-  function chooseCategory(next: AppleCategory) {
-    setCategory(next);
-    setChart(CHARTS[next]?.[0]?.id || 'top');
-    setOrder('top');
-    setItems([]);
-    setAvailableStorefronts([]);
-    setError('');
-  }
-
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (query.trim().length >= 2) onSearch(category, query.trim());
   }
 
-  return <section className="apple-tool-section" id="apple-tool" aria-labelledby="apple-tool-title">
+  return <section className="content-width apple-tool-section" id="apple-tool" aria-labelledby="apple-tool-title">
     <div className="apple-tool-heading">
       <div>
-        <div className="hero-kicker"><span className="hero-kicker-line"/> RUPA / TRENDS · APPLE CATALOGS</div>
-        <h1 id="apple-tool-title">Apple<br/><em>trends.</em></h1>
-        <p>Browse current charts or search for covers, posters, icons and other visual artwork across Apple catalogs.</p>
+        <div className="hero-kicker"><span className="hero-kicker-line"/> RUPA / CATEGORY / {categoryLabel.toUpperCase()}</div>
+        <h1 id="apple-tool-title">{categoryLabel}<br/><em>on view.</em></h1>
+        <p>Search this collection, then browse current picks and recent releases. Every result keeps its catalog source.</p>
       </div>
-      <div className="apple-tool-mark" aria-hidden="true"><Sparkles size={19}/><span>APPLE<br/>CATALOGS</span></div>
+      <div className="apple-tool-mark" aria-hidden="true"><Sparkles size={19}/><span>RUPA<br/>INDEX</span></div>
     </div>
 
     <div className="apple-search-section">
-      <label className="apple-search-label" htmlFor="apple-artwork-query">SEARCH THIS APPLE CATALOG</label>
+      <label className="apple-search-label" htmlFor="apple-artwork-query">SEARCH {categoryLabel.toUpperCase()}</label>
       <form className="apple-tool-search" onSubmit={submit}>
         <div className="apple-query-field"><Search size={20}/><input id="apple-artwork-query" value={query} onChange={event => setQuery(event.target.value)} aria-label={`Search ${categoryLabel} artwork`} placeholder={`${categoryLabel} title, creator, or Apple link…`}/></div>
         <Button type="submit" disabled={query.trim().length < 2}>Search <ArrowRight size={16}/></Button>
@@ -125,9 +126,6 @@ export function AppleTrendTool({ storefront, onStorefrontChange, onSearch, onOpe
     </div>
 
     <div className="apple-tool-controls">
-      <div className="apple-media-tabs" role="tablist" aria-label="Apple catalog categories">
-        {CATEGORIES.map(option => <button type="button" key={option.id} role="tab" aria-selected={category === option.id} className={category === option.id ? 'active' : ''} onClick={() => chooseCategory(option.id)}>{option.label}</button>)}
-      </div>
       <div className="apple-tool-filters">
         {activeChart && <>
           <label className="apple-filter"><span>Apple chart</span><select value={activeChart} onChange={event => setChart(event.target.value as AppleChartKind)} aria-label="Apple chart">{chartOptions.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}</select></label>
@@ -137,14 +135,14 @@ export function AppleTrendTool({ storefront, onStorefrontChange, onSearch, onOpe
     </div>
 
     {!activeChart ? <div className="apple-trend-empty">
-      <strong>Apple does not publish a chart for this catalog.</strong>
+      <strong>No chart is available for this category.</strong>
       <p>Use the search field above for artwork. Chart availability differs by Apple catalog and storefront.</p>
     </div> : <>
       <div className="apple-trend-header">
-        <div><span className="tiny-kicker">APPLE / {categoryLabel.toUpperCase()} / {chartLabel.toUpperCase()}</span><h2>{order === 'newest' && category === 'music' ? 'Newest in the album chart' : chartLabel}</h2></div>
+        <div><span className="tiny-kicker">{categoryLabel.toUpperCase()} / {chartLabel.toUpperCase()}</span><h2>{order === 'newest' ? `Newest ${categoryLabel.toLowerCase()} in this chart` : chartLabel}</h2></div>
         <a href="https://rss.marketingtools.apple.com/" target="_blank" rel="noreferrer">Apple RSS charts <ArrowUpRight size={14}/></a>
       </div>
-      {category === 'music' && <div className="apple-release-order" role="group" aria-label="Order Apple album artwork"><button type="button" className={order === 'top' ? 'active' : ''} aria-pressed={order === 'top'} onClick={() => setOrder('top')}>Top</button><button type="button" className={order === 'newest' ? 'active' : ''} aria-pressed={order === 'newest'} onClick={() => setOrder('newest')}>Newest</button></div>}
+      {items.some(item => item.releaseDate) && <div className="apple-release-order" role="group" aria-label={`Order ${categoryLabel} artwork`}><button type="button" className={order === 'top' ? 'active' : ''} aria-pressed={order === 'top'} onClick={() => setOrder('top')}>Top</button><button type="button" className={order === 'newest' ? 'active' : ''} aria-pressed={order === 'newest'} onClick={() => setOrder('newest')}>Newest</button></div>}
       {loading ? <div className="apple-trend-grid" aria-busy="true" aria-label="Loading Apple chart snapshot"><div className="apple-chart-progress" role="status"><LoaderCircle size={16} className="rupa-spinner"/> Loading Apple’s chart feed</div>{Array.from({ length: 10 }, (_, index) => <div className="apple-trend-skeleton" key={index}/>)}</div>
         : error ? <div className="apple-trend-empty" role="status"><strong>Apple charts could not be loaded</strong><p>{error} You can still search the Apple catalog below.</p></div>
           : visibleItems.length === 0 ? <div className="apple-trend-empty"><strong>No chart items are available for this catalog.</strong><p>Try another storefront or search this Apple catalog below.</p></div>
