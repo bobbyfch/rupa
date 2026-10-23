@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rupa-shell-v4';
+const CACHE_NAME = 'rupa-shell-v5';
 const OFFLINE_FILES = [
   'offline/artworks.json',
   // Small offline search indexes. Large game/anime shards and the museum pack are cached the first time they are used.
@@ -58,9 +58,14 @@ self.addEventListener('fetch', event => {
       }
     }
     const cached = await cache.match(request);
-    if (url.pathname.endsWith('/collections/ghibli.json')) {
-      // The curated poster list can change independently of the shell. Prefer the current index on every visit,
-      // but keep the latest successful response available if the device is offline.
+    if (url.pathname.endsWith('/collections/ghibli.json')
+      || url.pathname.endsWith('/collections/shinkai.json')
+      || url.pathname.endsWith('/collections/shinkai-assets.json')
+      || url.pathname.endsWith('/collections/shinkai-assets.v2.json')
+      || url.pathname.endsWith('/collections/shinkai-exhibitions.json')
+      || url.pathname.endsWith('/data/apple-trends.json')
+      || url.pathname.endsWith('/data/games-trending.json')) {
+      // Refresh curated collections and chart snapshots on every visit, keeping the latest response for offline use.
       try {
         const response = await fetch(new Request(request, { cache: 'no-store' }));
         if (response.ok) {

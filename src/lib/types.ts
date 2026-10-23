@@ -16,6 +16,7 @@ export interface Artwork {
   id: string; category: Exclude<Category, 'all'>; title: string; subtitle: string;
   year?: string; source: string; sourceUrl: string; imageUrl: string; previewUrl: string; downloadUrl?: string; hdDownloadUrls?: string[]; sdDownloadUrl?: string;
   mediaId?: string; kind?: ArtKind; language?: string | null; artist?: string; artistUrl?: string; provider?: string;
+  releaseDate?: string;
   licenseUrl?: string; licenseLabel?: string; attribution?: string; originalWidth?: number; originalHeight?: number;
   rights?: 'unverified' | 'source-only' | 'open-license';
   rightsStatus?: 'cc0' | 'public-domain' | 'cc-by' | 'cc-by-sa' | 'permission-granted' | 'reference-only' | 'unknown' | 'blocked';
@@ -38,8 +39,9 @@ export interface Hunt { id: string; profileId: string; title: string; note: stri
 export interface Preferences {
   theme: 'light' | 'dark'; gallery: 'grid' | 'masonry'; language: string; uiLocale?: 'id' | 'en' | 'ja';
   printSize: 'A4' | 'A3' | 'A2'; minPpi: 150 | 200 | 300;
+  accent?: 'vermilion' | 'cobalt' | 'citron' | 'forest' | 'coral'; oled?: boolean;
 }
 export interface LocalProfile { id: string; name: string; createdAt: number; updatedAt: number; preferences: Preferences; syncCode?: string }
-export const DEFAULT_PREFERENCES: Preferences = { theme: 'light', gallery: 'masonry', language: 'all', uiLocale: 'id', printSize: 'A3', minPpi: 200 };
+export const DEFAULT_PREFERENCES: Preferences = { theme: 'light', gallery: 'masonry', language: 'all', uiLocale: 'id', printSize: 'A3', minPpi: 200, accent: 'vermilion', oled: false };
 /** Artwork the user supplied themselves. Stored only in this browser (IndexedDB); never committed, mirrored or synced. */
 export interface UserArtwork { id: string; profileId: string; title: string; region?: string; edition?: string; notes?: string; blob: Blob; mime: string; width: number; height: number; bytes: number; createdAt: number }

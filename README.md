@@ -1,40 +1,51 @@
 # Rupa
 
-Rupa is an independent, source-aware visual library for finding artwork, comparing editions, and keeping useful references together.
+**A visual archive for art, film, music, books, apps, and games.**
 
-## What it does
+Rupa brings the image forward and keeps its source close. The interface takes cues from contemporary museum catalogues: quiet typography, generous margins, tactile glass surfaces, and imagery in its natural shape. It is an independent, non-profit project.
 
-- Search Apple Music, Books, TV, Podcasts, and App Store artwork.
-- Browse Studio Ghibli and Makoto Shinkai film art with links to official source pages.
-- Find indexed game covers, logos, title screens, and gameplay images by title and platform.
-- Prepare still images for download with crop, size, format, and 2× interpolation controls.
-- Save references locally, organize them into folders, and export a personal archive.
+## Explore
+
+- **Artwork catalog** — search across works, editions, and image archives.
+- **Apple artwork** — browse Apple charts, sort albums by release date, and search Apple Music, Books, TV, Podcasts, and App Store artwork.
+- **Game archive** — browse current Steam top sellers, search 17 classic console indexes and modern PlayStation, Nintendo Switch, Xbox, and PC catalogs, then view editions, covers, screenshots, logos, and icons.
+- **Ghibli** — browse the film timeline, regional posters, and official stills.
+- **Makoto Shinkai** — browse film posters, still galleries, and exhibition images linked to official film and archive pages.
+- **Saved archive** — organize references in local profiles and folders, and export a personal backup.
+
+Image cards link to the catalog, film page, archive, or store that supplies the image. Rupa keeps source labels and URLs with the artwork. Collection image URLs remain upstream where possible; availability can change when a source site changes its files or blocks requests. Saving an image is an explicit action in the export panel.
 
 ## Run locally
 
 Requirements: Node.js 22 or later.
 
-    npm install
-    npm run dev
+```sh
+npm install
+npm run dev
+```
 
-Optional worker features use VITE_API_URL (see .env.example). Do not put secrets in client-side Vite variables.
+The optional Cloudflare Worker provides same-origin image processing, artist image search, and encrypted cross-device sync. Set `VITE_API_URL` to the Worker URL for those features. The local Vite server includes the image proxy for development. Never put API secrets in client-side `VITE_*` variables.
 
-## Build and checks
+## Data and sources
 
-    npm run typecheck
-    npm test
-    npm run build
+Rupa combines project indexes with links to upstream collections. Current examples include Apple RSS charts, Steam's top-seller chart, Libretro game thumbnails, Wikidata and Wikimedia Commons, Studio Ghibli's official works archive, and the Makoto Shinkai Works portal and official film sites. Each collection page links to its source; the Steam chart links to the store listing for every game.
 
-## Artwork and sources
+Image files are not added to the Shinkai collection index: the page stores image URLs, film titles, and source links. Users can prepare an image for download or wallpaper from the artwork panel. Wallpaper output is a file to select in the device's wallpaper settings; a browser cannot silently change the desktop background.
 
-Rupa links to source pages and keeps upstream image references where possible. Image availability and reuse terms are set by each publisher, archive, or contributor. A non-profit purpose does not grant reuse rights. Studio Ghibli’s still gallery describes its own terms on the official page; the Shinkai Works collection links to official film pages. Game index metadata comes from the linked repositories and is reference-only.
+Saved items and preferences live in the browser's local database. Sync is optional and requires a configured Worker and database.
 
-Rupa does not claim ownership of third-party artwork. Check the source and its license before downloading, publishing, or reusing an image. Some artwork may be unavailable when an upstream host blocks hotlinking or browser access.
+## Project commands
 
-## Data handling
+```sh
+npm run typecheck
+npm test
+npm run build
+npm run refresh:apple-trends
+npm run refresh:game-trends
+```
 
-Saved items and profile preferences are stored in the browser’s local database. Optional sync requires the separately configured worker and database. Exported archive files are created on demand.
+The GitHub Pages workflow refreshes the chart snapshots when sources respond, builds the site, and deploys `dist`. The workflow is started manually from GitHub Actions.
 
-## License
+## Stack
 
-This repository does not include a separate license for the application code. Third-party artwork and datasets remain subject to their own terms.
+React, TypeScript, Vite, IndexedDB via Dexie, and a Cloudflare Worker for optional API features.

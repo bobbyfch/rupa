@@ -6,6 +6,7 @@ import type { GameAssetFilter, IndexManifest } from '../lib/catalog';
 import { Button } from './ui/button';
 import { GameConsoleSelector } from './GameConsoleSelector';
 import { GameDetailPage } from './GameDetailPage';
+import { GameTrendingPanel } from './GameTrendingPanel';
 
 const initialPlatform = () => new URLSearchParams(window.location.search).get('platform') || 'all';
 
@@ -119,7 +120,8 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
       <span>Try</span>
       {['Mario GBA', 'Zelda N64', 'Final Fantasy X PS2', 'PCSE00628'].map(example => <button type="button" key={example} onClick={() => { setQuery(example); void runSearch(example, 'all'); }}>{example}</button>)}
     </div>
-    <div className="game-finder-source"><Info size={15}/><span>17 classic indexes plus PS4, PS5, Nintendo Switch, Xbox, and PC search. Modern image results are linked to Wikidata and Wikimedia Commons.</span></div>
+    {!searched && <GameTrendingPanel onSelect={title => { setQuery(title); void runSearch(title, platform); window.scrollTo({ top: 0, behavior: 'smooth' }); }}/>}
+    <div className="game-finder-source"><Info size={15}/><span>17 classic indexes plus PS4, PS5, Nintendo Switch, Xbox, and PC search. Modern results include Steam top sellers, Wikidata, and Wikimedia Commons.</span></div>
     {manifestError && <div className="search-warning" role="status"><Info size={16}/><span>Console list unavailable. {manifestError}</span></div>}
     <div className="results-head" aria-live="polite" aria-atomic="true"><span>{searched ? `${groupedResults.length} GAMES · ${results.length} ${assetFilter==='all'?'ASSETS':assetFilter.toUpperCase().replace('-',' ')}` : 'READY TO SEARCH'}</span><span>{platform === 'all' ? '23 SYSTEMS' : platforms.find(item => item.id === platform)?.label.toUpperCase() || 'CONSOLE INDEX'}</span></div>
     {warnings.length > 0 && <div className="search-warning" role="status" aria-live="polite"><Info size={16}/><span>Some indexes could not be reached: {warnings.join(' · ')}</span></div>}
@@ -142,6 +144,6 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
       })}
     </div>}
     {groupedResults.length > visibleCount && <div className="ghibli-more"><Button variant="outline" onClick={() => setVisibleCount(count => count + 72)}>Load more games <span>({groupedResults.length - visibleCount} remaining)</span></Button></div>}
-    <p className="game-finder-footnote">The indexed Libretro thumbnails are capped at 512 px wide. SteamGridDB and LaunchBox open separate catalogs for additional promotional art; their results are not merged into Rupa’s index. Game assets remain the property of their respective publishers and contributors.</p>
+    <p className="game-finder-footnote">The indexed Libretro thumbnails are capped at 512 px wide. SteamGridDB and LaunchBox open separate catalogs for additional artwork; their results are not merged into Rupa’s index.</p>
   </section>;
 }

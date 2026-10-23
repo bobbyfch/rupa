@@ -43,7 +43,7 @@ function WorkCard({ hit, onLive, thumb = true }: { hit: WorkHit; onLive: (catego
     {work.image && <img className="cat-work-thumb" fetchPriority="low" decoding="async" src={work.image} crossOrigin={imageCors(work.image)} alt="" loading="lazy" width="96" height="128" onError={event => { event.currentTarget.hidden = true; }} />}
     <p className="cat-work-meta">{[work.kind === 'artist' ? 'Artist' : work.kind === 'franchise' ? 'Franchise' : FILTERS.find(f => f.id === work.category)?.label || 'Work', work.year, work.creators, work.note].filter(Boolean).join(' · ')}</p>
     {aliases.length > 0 && <p className="cat-aliases">{aliases.map(alias => <span key={alias.value} lang={alias.script === 'latin' ? undefined : alias.script}>{alias.value}</span>)}</p>}
-    {editions.length > 0 && <ul className="cat-editions" aria-label="Known editions">{editions.map(edition => <li key={edition.id} className={matchedEditions.has(edition.id) ? 'is-match' : ''}><b>{edition.region}</b> {edition.year} · {edition.version}<small>no image mirrored</small></li>)}</ul>}
+    {editions.length > 0 && <ul className="cat-editions" aria-label="Known editions">{editions.map(edition => <li key={edition.id} className={matchedEditions.has(edition.id) ? 'is-match' : ''}><b>{edition.region}</b> {edition.year} · {edition.version}<small>Image not indexed</small></li>)}</ul>}
     <div className="cat-work-actions">
       {isLive(work.category) && <Button variant="outline" size="sm" onClick={() => onLive(work.category as Category, work.aliases.find(a => a.script === 'latin' && a.value === work.title)?.value || work.title)}>Find artwork live <ArrowRight size={14} /></Button>}
       <a className="source-link" href={wiki(work)} target="_blank" rel="noreferrer">Reference <ArrowUpRight size={14} /></a>
@@ -55,7 +55,7 @@ const SOURCE_LABELS: Record<string, string> = { 'cleveland-cc0': 'Cleveland Muse
 const sourceOf = (item: Artwork) => item.sourceId || 'cleveland-cc0';
 const STATUS_LABEL: Record<string, string> = { 'confirmed-working': 'Working', candidate: 'Candidate', 'metadata-only': 'Index only', 'needs-permission': 'Needs permission', 'blocked-here': 'Blocked from here', 'unreachable-here': 'Unreachable from here' };
 
-/** Every mirrored, open-licensed file, browsable without typing a query. */
+/** Browse the locally available archive without typing a query. */
 function MirroredBrowser({ onOpen }: { onOpen: (item: Artwork) => void }) {
   const [items, setItems] = useState<Artwork[]>([]), [kind, setKind] = useState('all'), [source, setSource] = useState('all'), [sort, setSort] = useState('title'), [shown, setShown] = useState(24);
   useEffect(() => { const controller = new AbortController(); searchOfflineArt('', controller.signal).then(setItems).catch(() => undefined); return () => controller.abort(); }, []);
@@ -66,7 +66,7 @@ function MirroredBrowser({ onOpen }: { onOpen: (item: Artwork) => void }) {
   if (!items.length) return null;
   const chip = (value: string, current: string, set: (v: string) => void, text: string) => <button key={value} className={current === value ? 'active' : ''} aria-pressed={current === value} onClick={() => { set(value); setShown(24); }}>{text}</button>;
   return <section aria-label="Browse mirrored artwork">
-    <h2 className="cat-h">Browse the open-licensed archive <span>{list.length} of {items.length}</span></h2>
+    <h2 className="cat-h">Browse the image archive <span>{list.length} of {items.length}</span></h2>
     <div className="cat-filters" role="group" aria-label="Type">{[['all', 'All'], ['art', 'Art & prints'], ['poster', 'Posters'], ['books', 'Book covers']].map(([v, t]) => chip(v, kind, setKind, t))}</div>
     <div className="cat-filters" role="group" aria-label="Source">{chip('all', source, setSource, 'Any source')}{sources.map(id => chip(id, source, setSource, SOURCE_LABELS[id] || id))}
       <label className="cat-sort">Sort <select value={sort} onChange={event => setSort(event.target.value)}><option value="title">Title</option><option value="resolution">Resolution, high first</option></select></label></div>
@@ -81,14 +81,13 @@ function SourcesPanel() {
   useEffect(() => { loadSources().then(setData).catch(() => undefined); }, []);
   useEffect(() => { if (data && window.location.hash === '#sources') document.getElementById('sources')?.scrollIntoView({ block: 'start' }); }, [data]);
   if (!data) return null;
-  const used = data.sources.filter(s => s.role !== 'rejected'), rejected = data.sources.filter(s => s.role === 'rejected');
-  return <details id="sources" className="cat-local cat-sources" open={window.location.hash === '#sources'}><summary>Sources &amp; rights <span>{used.length}</span></summary>
-    <p className="cat-status">Measured {data.generatedAt}. Only files whose own record allows redistribution are mirrored. Everything else is indexed or linked.</p>
-    <div className="cat-table-wrap"><table className="cat-table"><thead><tr><th scope="col">Source</th><th scope="col">Role</th><th scope="col">Status</th><th scope="col">Rights</th><th scope="col">Mirrored</th></tr></thead><tbody>
-      {used.map(s => <tr key={s.id}><th scope="row">{s.upstream?.startsWith('http') ? <a href={s.upstream} target="_blank" rel="noreferrer">{s.name}</a> : s.name}</th><td>{s.role.replace(/-/g, ' ')}</td><td><span className={'cat-badge cat-status-' + s.status}>{STATUS_LABEL[s.status] || s.status}</span>{s.lastChecked && <small> {s.lastChecked}</small>}</td><td>{s.rightsMode || '-'}</td><td>{s.mirrored || '-'}</td></tr>)}
+  const used = data.sources.filter(s => s.role !== 'rejected');
+  return <details id="sources" className="cat-local cat-sources" open={window.location.hash === '#sources'}><summary>Sources <span>{used.length}</span></summary>
+    <p className="cat-status">Source links and the latest availability check for each indexed catalog.</p>
+    <div className="cat-table-wrap"><table className="cat-table"><thead><tr><th scope="col">Source</th><th scope="col">Catalog role</th><th scope="col">Availability</th></tr></thead><tbody>
+      {used.map(s => <tr key={s.id}><th scope="row">{s.upstream?.startsWith('http') ? <a href={s.upstream} target="_blank" rel="noreferrer">{s.name}</a> : s.name}</th><td>{s.role.replace(/-/g, ' ')}</td><td><span className={'cat-badge cat-status-' + s.status}>{STATUS_LABEL[s.status] || s.status}</span>{s.lastChecked && <small> {s.lastChecked}</small>}</td></tr>)}
     </tbody></table></div>
-    {data.linkOnly && <><h3 className="cat-sub">Archives we link to and never copy</h3><ul className="cat-linkonly">{data.linkOnly.map(a => <li key={a.url}><a href={a.url} target="_blank" rel="noreferrer">{a.name} <ArrowUpRight size={12} /></a><small>{a.about}</small></li>)}</ul></>}
-    <p className="cat-status">Not used because they need an API key: {rejected.map(s => s.name).join(', ')}.</p>
+    {data.linkOnly && <><h3 className="cat-sub">More image sources</h3><ul className="cat-linkonly">{data.linkOnly.map(a => <li key={a.url}><a href={a.url} target="_blank" rel="noreferrer">{a.name} <ArrowUpRight size={12} /></a><small>{a.about}</small></li>)}</ul></>}
   </details>;
 }
 
@@ -141,9 +140,9 @@ export default function CatalogPage({ initialQuery, profileId, notify, onOpen, o
   // The 2.6 MB audiobook index arrives last, so it renders last and pushes nothing above it.
   const audiobookTitles = titleHits.filter(hit => hit.work.category === 'audiobooks');
   return <section className="content-width search-content catalog-page">
-    <div className="listing-header"><div className="tiny-kicker">EDITIONS / OFFLINE INDEX</div><h1>Works, editions &amp; variants.</h1>
-      <p>Search a title in any language across every collection: known regional editions, where artwork exists, and a Wikidata or LibriVox catalog entry for titles without a free image. Only open-licensed files are mirrored; everything else is indexed and linked, never copied.</p></div>
-    <form className="search-bar" onSubmit={submit}><Search size={21} /><input aria-label="Search works and editions" value={query} onChange={e => setQuery(e.target.value)} placeholder="千と千尋, Final Fantasy X PS2, Toulouse-Lautrec 1895…" /><Button type="submit">Search <ArrowRight size={16} /></Button></form>
+    <div className="listing-header"><div className="tiny-kicker">RUPA / ARTWORK CATALOG</div><h1>Artwork catalog.</h1>
+      <p>Search works across film, games, books, and visual archives. Explore indexed editions, find matching artwork, and open each result at its source.</p></div>
+    <form className="search-bar" onSubmit={submit}><Search size={21} /><input aria-label="Search artwork catalog" value={query} onChange={e => setQuery(e.target.value)} placeholder="Spirited Away, Final Fantasy X PS2, Toulouse-Lautrec…" /><Button type="submit">Search <ArrowRight size={16} /></Button></form>
     <div className="cat-filters" role="group" aria-label="Collection filter">{FILTERS.map(f => <button key={f.id} className={filter === f.id ? 'active' : ''} aria-pressed={filter === f.id} onClick={() => { setFilter(f.id); commit(submitted, f.id); }}>{f.label}</button>)}</div>
     <p className="cat-status" role="status">{error || (busy ? 'Searching offline indexes…' : totals ? `${totals.works.toLocaleString('en-US')} works · ${totals.games} game platforms · ${totals.titles.toLocaleString('en-US')} indexed titles · searchable offline` : 'Loading offline index…')}</p>
     <div className="cat-body">
@@ -153,7 +152,7 @@ export default function CatalogPage({ initialQuery, profileId, notify, onOpen, o
       <div><span className="tiny-kicker">THEMES</span><div className="cat-chips">{works.themes.map(theme => <button key={theme.id} onClick={() => { setQuery(theme.query); commit(theme.query); }}>{theme.label}</button>)}</div></div>
       <details><summary>Variant types Rupa tracks</summary><p className="cat-facets">Packaging: {works.facets.packaging.join(', ')}.<br />Artwork: {works.facets.artwork.join(', ')}.</p></details>
     </div>}
-    {mirrored.length > 0 && <section aria-label="Mirrored artwork"><h2 className="cat-h">Mirrored &amp; open-licensed</h2><div className="cat-grid">{mirrored.map(item => <div key={item.id}><ArtTile item={item} onOpen={onOpen} /><small className="cat-res">{resolutionLabel(item.originalWidth, item.originalHeight)} · {item.licenseLabel || 'Open license'}</small></div>)}</div></section>}
+    {mirrored.length > 0 && <section aria-label="Artwork from image archives"><h2 className="cat-h">Artwork from image archives</h2><div className="cat-grid">{mirrored.map(item => <div key={item.id}><ArtTile item={item} onOpen={onOpen} /><small className="cat-res">{resolutionLabel(item.originalWidth, item.originalHeight)} · {SOURCE_LABELS[sourceOf(item)] || item.source}</small></div>)}</div></section>}
     {hits.length > 0 && <section aria-label="Works and editions"><h2 className="cat-h">Works &amp; editions <span>{hits.length}</span></h2><div className="cat-works">{hits.map(hit => <WorkCard key={hit.work.id} hit={hit} onLive={onLive} />)}</div></section>}
     {catalogTitles.length > 0 && <section aria-label="Catalog titles"><h2 className="cat-h">Catalog titles <span>{catalogTitles.length}</span></h2><div className="cat-works">{catalogTitles.map((hit, index) => <WorkCard key={hit.work.id} hit={hit} onLive={onLive} thumb={index < THUMBS_PER_LIST} />)}</div></section>}
     {indexHits.length > 0 && <section aria-label="Indexed titles"><h2 className="cat-h">Indexed titles <span>{indexHits.length}</span></h2><div className="cat-grid">{indexHits.map(item => <ArtTile key={item.id} item={item} onOpen={onOpen} />)}</div></section>}

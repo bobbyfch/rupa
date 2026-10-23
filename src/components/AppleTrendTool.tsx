@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { ArrowRight, ArrowUpRight, Heart, Image as ImageIcon, Search, Sparkles } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Heart, Image as ImageIcon, LoaderCircle, Search, Sparkles } from 'lucide-react';
 import type { AppleChartKind } from '../lib/providers';
 import { fetchAppleTrendArtworkWithAvailability } from '../lib/providers';
 import { APPLE_STOREFRONTS } from '../lib/appleStorefronts';
@@ -33,7 +33,7 @@ function AppleTrendImage({ item }: { item: Artwork }) {
   const [sourceIndex, setSourceIndex] = useState(0);
   useEffect(() => setSourceIndex(0), [item.id, sources]);
   const source = sources[sourceIndex];
-  return source ? <img src={source} alt={`${item.title} artwork`} loading="lazy" decoding="async" onError={() => setSourceIndex(index => index + 1)}/> : <span className="apple-trend-art-missing" aria-label="Artwork unavailable"><ImageIcon size={20}/></span>;
+  return source ? <img src={source} alt={`${item.title} artwork`} loading="lazy" decoding="async" onError={() => setSourceIndex(index => index + 1)}/> : <span className="apple-trend-art-missing" role="img" aria-label={`${item.title} artwork unavailable`}><ImageIcon size={20}/><small>Artwork unavailable</small></span>;
 }
 
 export function AppleTrendTool({ storefront, onStorefrontChange, onSearch, onOpen, onFavorite, favoriteIds }: {
@@ -51,11 +51,15 @@ export function AppleTrendTool({ storefront, onStorefrontChange, onSearch, onOpe
   const [availableStorefronts, setAvailableStorefronts] = useState<AppleStorefront[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [order, setOrder] = useState<'top' | 'newest'>('top');
 
   const chartOptions = CHARTS[category] || [];
   const activeChart = chartOptions.find(option => option.id === chart)?.id || chartOptions[0]?.id;
   const chartLabel = useMemo(() => chartOptions.find(option => option.id === activeChart)?.label || '', [activeChart, chartOptions]);
   const categoryLabel = CATEGORIES.find(option => option.id === category)?.label || 'Apple';
+  const visibleItems = useMemo(() => order === 'newest' && category === 'music'
+    ? [...items].sort((a, b) => (b.releaseDate || '').localeCompare(a.releaseDate || ''))
+    : items, [items, order, category]);
   const storefrontOptions = availableStorefronts.length
     ? APPLE_STOREFRONTS.filter(option => availableStorefronts.includes(option.id))
     : APPLE_STOREFRONTS;
@@ -91,6 +95,7 @@ export function AppleTrendTool({ storefront, onStorefrontChange, onSearch, onOpe
   function chooseCategory(next: AppleCategory) {
     setCategory(next);
     setChart(CHARTS[next]?.[0]?.id || 'top');
+    setOrder('top');
     setItems([]);
     setAvailableStorefronts([]);
     setError('');
@@ -136,13 +141,14 @@ export function AppleTrendTool({ storefront, onStorefrontChange, onSearch, onOpe
       <p>Use the search field above for artwork. Chart availability differs by Apple catalog and storefront.</p>
     </div> : <>
       <div className="apple-trend-header">
-        <div><span className="tiny-kicker">APPLE / {categoryLabel.toUpperCase()} / {chartLabel.toUpperCase()}</span><h2>{chartLabel}</h2></div>
+        <div><span className="tiny-kicker">APPLE / {categoryLabel.toUpperCase()} / {chartLabel.toUpperCase()}</span><h2>{order === 'newest' && category === 'music' ? 'Newest in the album chart' : chartLabel}</h2></div>
         <a href="https://rss.marketingtools.apple.com/" target="_blank" rel="noreferrer">Apple RSS charts <ArrowUpRight size={14}/></a>
       </div>
-      {loading ? <div className="apple-trend-grid" aria-busy="true" aria-label="Loading Apple chart snapshot">{Array.from({ length: 10 }, (_, index) => <div className="apple-trend-skeleton" key={index}/>)}</div>
+      {category === 'music' && <div className="apple-release-order" role="group" aria-label="Order Apple album artwork"><button type="button" className={order === 'top' ? 'active' : ''} aria-pressed={order === 'top'} onClick={() => setOrder('top')}>Top</button><button type="button" className={order === 'newest' ? 'active' : ''} aria-pressed={order === 'newest'} onClick={() => setOrder('newest')}>Newest</button></div>}
+      {loading ? <div className="apple-trend-grid" aria-busy="true" aria-label="Loading Apple chart snapshot"><div className="apple-chart-progress" role="status"><LoaderCircle size={16} className="rupa-spinner"/> Loading Apple’s chart feed</div>{Array.from({ length: 10 }, (_, index) => <div className="apple-trend-skeleton" key={index}/>)}</div>
         : error ? <div className="apple-trend-empty" role="status"><strong>Apple charts could not be loaded</strong><p>{error} You can still search the Apple catalog below.</p></div>
-          : items.length === 0 ? <div className="apple-trend-empty"><strong>No chart items are available for this catalog.</strong><p>Try another storefront or search this Apple catalog below.</p></div>
-            : <div className="apple-trend-grid">{items.map((item, index) => <article className="apple-trend-card" key={item.id}>
+          : visibleItems.length === 0 ? <div className="apple-trend-empty"><strong>No chart items are available for this catalog.</strong><p>Try another storefront or search this Apple catalog below.</p></div>
+            : <div className="apple-trend-grid">{visibleItems.map((item, index) => <article className="apple-trend-card" key={item.id}>
               <button className="apple-trend-art" type="button" onClick={() => onOpen(item)} aria-label={`Inspect ${item.title}`}><AppleTrendImage item={item}/><span className="apple-trend-rank">{String(index + 1).padStart(2, '0')}</span></button>
               <div className="apple-trend-meta"><button type="button" className="apple-trend-title" onClick={() => onOpen(item)}>{item.title}</button><span>{item.subtitle}</span><a className="apple-trend-store-link" href={item.sourceUrl} target="_blank" rel="noreferrer">View in Apple <ArrowUpRight size={12}/></a></div>
               <button type="button" className={`apple-trend-heart${favoriteIds.has(item.id) ? ' saved' : ''}`} onClick={() => onFavorite(item)} aria-label={favoriteIds.has(item.id) ? `Remove ${item.title} from favorites` : `Save ${item.title} to favorites`}><Heart size={17} fill={favoriteIds.has(item.id) ? 'currentColor' : 'none'}/></button>

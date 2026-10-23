@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowDown, ArrowLeft, ArrowUpRight, Heart, ImageOff, RefreshCw } from 'lucide-react';
+import { ArrowDown, ArrowLeft, ArrowUpRight, RefreshCw } from 'lucide-react';
 import type { Artwork } from '../lib/types';
 import { Button } from './ui/button';
+import { CollectionFilmTimeline } from './CollectionFilmTimeline';
+import { CollectionArtworkGrid } from './CollectionArtworkGrid';
 
 type GhibliStill = { key: string; thumbnailUrl: string | null; sourceUrl: string | null };
 type GhibliPosterEdition = { id: string; label: string; region?: string; year?: number; artist?: string; imageUrl: string; sourceUrl: string; sourceName: string };
@@ -18,13 +20,6 @@ function makeArtwork(film: GhibliFilm, still: GhibliStill): Artwork {
 
 function makePosterArtwork(film: GhibliFilm, edition: GhibliPosterEdition): Artwork {
   return { id: `ghibli:${film.id}:poster:${edition.id}`, category: 'ghibli', title: `${film.englishTitle || film.title} · ${edition.label}`, subtitle: `${film.year || ''} · ${edition.label}`.replace(/^ · | · $/g, ''), year: edition.year ? String(edition.year) : film.year ? String(film.year) : undefined, source: edition.sourceName, provider: edition.sourceName, sourceUrl: edition.sourceUrl, imageUrl: edition.imageUrl, previewUrl: edition.imageUrl, downloadUrl: edition.imageUrl, hdDownloadUrls: [edition.imageUrl], kind: 'poster', rights: 'source-only', rightsStatus: 'reference-only', attribution: edition.artist ? `${edition.artist} · ${edition.sourceName}` : edition.sourceName, artist: edition.artist, region: edition.region };
-}
-
-function PosterVisual({ src, title }: { src: string; title: string }) {
-  const [failed, setFailed] = useState(!src);
-  useEffect(() => setFailed(!src), [src]);
-  if (failed) return <span className="ghibli-image-fallback" role="img" aria-label={`${title} preview unavailable`}><ImageOff size={18}/><small>Preview unavailable</small></span>;
-  return <img src={src} alt={title} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={() => setFailed(true)}/>;
 }
 
 export function GhibliCollection({ favoriteIds, onFavorite, onOpen, onBack }: { favoriteIds: Set<string>; onFavorite: (item: Artwork) => void; onOpen: (item: Artwork) => void; onBack: () => void }) {
@@ -73,7 +68,8 @@ export function GhibliCollection({ favoriteIds, onFavorite, onOpen, onBack }: { 
 
   const setYear = (year: number | null) => { setYearFilter(year); setFilmFilter('all'); setVisibleCount(PAGE_SIZE); };
   const setFilm = (film: GhibliFilm) => { setFilmFilter(film.id); setYearFilter(null); setVisibleCount(PAGE_SIZE); setPosterRegion('all'); };
-  const posterForFilm = (film: GhibliFilm) => film.posterUrl || film.posterEditions?.[0]?.imageUrl || '';
+  const timelineEntries = orderedFilms.map(film => ({ id: film.id, title: film.englishTitle || film.title, year: film.year, image: film.posterUrl || film.posterEditions?.[0]?.imageUrl || '', detail: film.stills.length ? `${film.stills.length} stills` : 'Poster only' }));
+  const posterCards = filteredPosters.map(({ film, edition }) => ({ artwork: makePosterArtwork(film, edition), image: edition.imageUrl, heading: film.englishTitle || film.title, detail: `${edition.label}${edition.year ? ` · ${edition.year}` : ''}${edition.artist ? ` · ${edition.artist}` : ''}`, badge: edition.region || 'Edition' }));
 
   return <section className="content-width ghibli-page" aria-labelledby="ghibli-title">
     <button className="back-to-collections" type="button" onClick={onBack}><ArrowLeft size={16}/> Tools &amp; collections</button>
@@ -91,28 +87,18 @@ export function GhibliCollection({ favoriteIds, onFavorite, onOpen, onBack }: { 
     <div className="ghibli-timeline-block ghibli-anchor" id="ghibli-timeline">
       <div className="ghibli-section-label"><span>FILM TIMELINE</span><small>Newest release first · select a film</small></div>
       <div className="ghibli-year-tags" aria-label="Filter by release year"><button type="button" className={yearFilter === null && filmFilter === 'all' ? 'active' : ''} onClick={() => setYear(null)}>All films</button>{years.map(year => <button type="button" key={year} className={yearFilter === year ? 'active' : ''} onClick={() => setYear(year)}>{year}</button>)}</div>
-      <div className="ghibli-film-timeline" aria-label="Studio Ghibli films">{orderedFilms.map(film => <button type="button" key={film.id} aria-pressed={filmFilter === film.id} className={`ghibli-film-tag${filmFilter === film.id ? ' active' : ''}${film.stills.length ? '' : ' no-stills'}`} onClick={() => setFilm(film)} title={`${film.year || 'Year unknown'} · ${film.englishTitle || film.title}`}><PosterVisual src={posterForFilm(film)} title={`${film.englishTitle || film.title} poster`}/><span className="ghibli-film-tag-copy"><span>{film.year || '—'}</span><strong>{film.englishTitle || film.title}</strong><small>{film.stills.length ? `${film.stills.length} stills` : 'Poster · no stills'}</small></span></button>)}</div>
+      <CollectionFilmTimeline films={timelineEntries} selectedId={filmFilter === 'all' ? null : filmFilter} onSelect={id => { const film = orderedFilms.find(entry => entry.id === id); if (film) setFilm(film); }} label="Studio Ghibli films" className="ghibli-film-timeline"/>
     </div>
 
     <section className="ghibli-poster-archive ghibli-anchor" id="ghibli-posters" aria-labelledby="ghibli-poster-title">
       <div className="ghibli-poster-heading"><div><span className="tiny-kicker">{selectedFilm ? `${selectedFilm.year || ''} / ${selectedFilm.englishTitle || selectedFilm.title}` : 'REGIONAL RELEASE ART'}</span><h2 id="ghibli-poster-title">{selectedFilm ? 'Posters for this film.' : 'Poster archive.'}</h2></div><span>{selectedFilm ? `${posterEntries.length} visuals · selected film` : `${totalPosterEditions} regional editions`}</span></div>
       <p>{selectedFilm ? 'The official Japanese visual and regional releases are kept together. Open a poster to inspect its size and download options.' : 'China and other regional editions, grouped by film. Choose a film in the timeline to see its official poster beside its regional versions.'}</p>
       {posterEntries.length > 0 && <div className="ghibli-poster-regions" role="group" aria-label="Filter poster editions by region"><button type="button" className={posterRegion === 'all' ? 'active' : ''} aria-pressed={posterRegion === 'all'} onClick={() => setPosterRegion('all')}>All editions <span>{posterEntries.length}</span></button>{posterRegions.map(region => <button type="button" key={region} className={posterRegion === region ? 'active' : ''} aria-pressed={posterRegion === region} onClick={() => setPosterRegion(region)}>{region} <span>{posterEntries.filter(entry => (entry.edition.region || 'Other') === region).length}</span></button>)}</div>}
-      {filteredPosters.length > 0 ? <div className="ghibli-poster-grid">{filteredPosters.map(({ film, edition }) => {
-        const item = makePosterArtwork(film, edition), saved = favoriteIds.has(item.id);
-        return <article className="ghibli-poster-card" key={item.id}>
-          <button type="button" className="ghibli-poster-image" onClick={() => onOpen(item)} aria-label={`Inspect ${item.title}`}><PosterVisual src={edition.imageUrl} title={`${film.englishTitle || film.title} · ${edition.label}`}/><span>{edition.region || 'Edition'}{edition.year ? ` · ${edition.year}` : ''}</span></button>
-          <div className="ghibli-poster-info"><div><small className="ghibli-poster-film">{film.englishTitle || film.title}</small><strong>{edition.label}</strong><small>{edition.artist ? `${edition.artist} · ` : ''}{edition.sourceName}</small></div><button type="button" onClick={() => onFavorite(item)} className={saved ? 'saved' : ''} aria-label={saved ? 'Remove poster from favorites' : `Save ${edition.label} to favorites`} title={saved ? 'Remove from favorites' : 'Save to favorites'}><Heart size={17} fill={saved ? 'currentColor' : 'none'}/></button></div>
-          <a className="ghibli-poster-source" href={edition.sourceUrl} target="_blank" rel="noreferrer">Poster source <ArrowUpRight size={13}/></a>
-        </article>;
-      })}</div> : <div className="ghibli-empty"><strong>No poster editions for this filter</strong><p>Choose another region, or select a film with regional poster editions in the timeline.</p></div>}
+      {filteredPosters.length > 0 ? <CollectionArtworkGrid entries={posterCards} favorites={favoriteIds} onFavorite={onFavorite} onOpen={onOpen} mode="poster"/> : <div className="ghibli-empty"><strong>No poster editions for this filter</strong><p>Choose another region, or select a film with regional poster editions in the timeline.</p></div>}
     </section>
 
     <div className="ghibli-gallery-heading ghibli-anchor" id="ghibli-stills"><div><span className="tiny-kicker">{selectedFilm ? `${selectedFilm.year || ''} / ${selectedFilm.englishTitle || selectedFilm.title}` : yearFilter ? `RELEASE YEAR / ${yearFilter}` : 'ALL FILMS'}</span><h2>{selectedFilm?.englishTitle || selectedFilm?.title || (yearFilter ? `${yearFilter} releases` : 'Film stills')}</h2></div><a href={selectedFilm?.sourceUrl || 'https://www.ghibli.jp/works/'} target="_blank" rel="noreferrer">Open official film page <ArrowUpRight size={14}/></a></div>
-    {loading ? <div className="ghibli-loading" role="status"><RefreshCw size={17}/> Loading the film index…</div> : error ? <div className="ghibli-loading ghibli-error" role="status"><span>{error}</span><Button variant="outline" onClick={() => window.location.reload()}>Reload</Button></div> : filteredFilms.every(film => !film.stills.length) ? <div className="ghibli-empty"><strong>No still gallery is listed for this film</strong><p>The official works index includes this title, but no still-image set was found on its film page.</p></div> : <><div className="ghibli-still-grid">{pageItems.map(({ film, still, index }) => {
-      const item = makeArtwork(film, still), saved = favoriteIds.has(item.id);
-      return <article className="ghibli-still-card" key={item.id}><button type="button" className="ghibli-still-image" onClick={() => onOpen(item)} aria-label={`Inspect ${item.title} from Studio Ghibli`}><img src={still.thumbnailUrl || still.sourceUrl || ''} alt={`${film.englishTitle || film.title}, still ${index + 1}`} loading="lazy" decoding="async" referrerPolicy="no-referrer" onError={event => { if (still.sourceUrl && event.currentTarget.src !== still.sourceUrl) event.currentTarget.src = still.sourceUrl; }}/><span>{film.year}</span></button><div className="ghibli-still-info"><div><strong>{film.englishTitle || film.title}</strong><small>{film.year} · Still {still.key.match(/(\d+)$/)?.[1] || index + 1}</small></div><button type="button" onClick={() => onFavorite(item)} className={saved ? 'saved' : ''} aria-label={saved ? 'Remove from favorites' : `Save ${item.title} to favorites`} title={saved ? 'Remove from favorites' : 'Save to favorites'}><Heart size={17} fill={saved ? 'currentColor' : 'none'}/></button></div></article>;
-    })}</div>{stills.length > pageItems.length && <div className="ghibli-more"><Button variant="outline" onClick={() => setVisibleCount(count => count + PAGE_SIZE)}>Load more stills <span>({stills.length - pageItems.length} remaining)</span></Button></div>}</>}
+    {loading ? <div className="ghibli-loading" role="status"><RefreshCw size={17}/> Loading the film index…</div> : error ? <div className="ghibli-loading ghibli-error" role="status"><span>{error}</span><Button variant="outline" onClick={() => window.location.reload()}>Reload</Button></div> : filteredFilms.every(film => !film.stills.length) ? <div className="ghibli-empty"><strong>No still gallery is listed for this film</strong><p>The official works index includes this title, but no still-image set was found on its film page.</p></div> : <><CollectionArtworkGrid entries={pageItems.map(({ film, still, index }) => ({ artwork: makeArtwork(film, still), image: still.thumbnailUrl || still.sourceUrl || '', fallbackImage: still.thumbnailUrl && still.sourceUrl ? still.sourceUrl : undefined, heading: film.englishTitle || film.title, detail: `${film.year || ''} · Still ${still.key.match(/(\d+)$/)?.[1] || index + 1}`, badge: String(film.year || '') }))} favorites={favoriteIds} onFavorite={onFavorite} onOpen={onOpen} mode="still"/>{stills.length > pageItems.length && <div className="ghibli-more"><Button variant="outline" onClick={() => setVisibleCount(count => count + PAGE_SIZE)}>Load more stills <span>({stills.length - pageItems.length} remaining)</span></Button></div>}</>}
     <p className="ghibli-source-note">Film stills link to Studio Ghibli’s official pages. Regional poster previews link to their credited source pages; source terms apply.</p>
   </section>;
 }

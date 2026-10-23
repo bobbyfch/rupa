@@ -15,6 +15,10 @@ jobs:
         with: { node-version: '22', cache: 'npm' }
       - run: npm ci --no-audit --no-fund
       - run: npm test
+      - run: npm run refresh:apple-trends
+        continue-on-error: true
+      - run: npm run refresh:game-trends
+        continue-on-error: true
       - run: npm run build
         env:
           VITE_API_URL: ${{ vars.VITE_API_URL }}

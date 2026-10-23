@@ -61,7 +61,7 @@ test('image proxy allows image hosts used by enabled tools and collections',asyn
   const original=globalThis.fetch;
   globalThis.fetch=async()=>new Response(new Uint8Array([1,2,3]),{status:200,headers:{'content-type':'image/jpeg','content-length':'3'}});
   try{
-    for(const host of ['is1-ssl.mzstatic.com','a5.mzstatic.com','s4.anilist.co','i.ytimg.com','openaccess-cdn.clevelandart.org','uploads.mangadex.org','www.ghibli.jp','ghibli.jp','thumbnails.libretro.com','raw.githubusercontent.com','file.adquan.com','comicbook.com','assets.recordchina.co.jp','p2.cri.cn','www.ifensi.com','p3.itc.cn','p9.itc.cn','mir-s3-cdn-cf.behance.net','obj.shine.cn','images.shobserver.com']){
+    for(const host of ['is1-ssl.mzstatic.com','a5.mzstatic.com','s4.anilist.co','i.ytimg.com','openaccess-cdn.clevelandart.org','uploads.mangadex.org','www.ghibli.jp','ghibli.jp','thumbnails.libretro.com','raw.githubusercontent.com','file.adquan.com','comicbook.com','assets.recordchina.co.jp','p2.cri.cn','www.ifensi.com','p3.itc.cn','p9.itc.cn','mir-s3-cdn-cf.behance.net','obj.shine.cn','images.shobserver.com','en.shinkaiworks.com','shinkaiworks.com','tenkinoko.com','www.tenkinoko.com','kiminona.com','www.kiminona.com','kotonohanoniwa.jp','www.kotonohanoniwa.jp','cwfilms.jp','www.cwfilms.jp']){
       const url='https://'+host+'/cover.jpg';
       const result=await image({request:request('https://x.test/api/image?url='+encodeURIComponent(url))});
       assert.equal(result.status,200,host);

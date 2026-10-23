@@ -4,6 +4,7 @@ import App from './App';
 import './style.css';
 import './rupa-refinements.css';
 import './rupa-design.css';
+import './rupa-2026.css';
 import 'yet-another-react-lightbox/styles.css';
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App/></React.StrictMode>);
 

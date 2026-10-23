@@ -30,7 +30,8 @@
     "local:covers": "node scripts/local/fetch-covers.mjs",
     "verify:ghibli": "node scripts/verify/verify-ghibli-index.mjs",
     "refresh:ghibli": "node scripts/ingest/build-ghibli-collection.mjs",
-    "refresh:apple-trends": "node scripts/ingest/apple-trends.mjs"
+    "refresh:apple-trends": "node scripts/ingest/apple-trends.mjs",
+    "refresh:game-trends": "node scripts/ingest/steam-trending.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.0.0",

@@ -364,7 +364,7 @@ function appleChartArtworkItems(category:AppleCategory,country:AppleStorefront,e
     const releaseDate=String(raw['im:releaseDate']?.label||'');
     const hdDownloadUrls=[appleOriginalArtworkUrl(artwork),appleArtworkSizedUrl(artwork,10000),image,preview].filter((candidate,position,all):candidate is string=>Boolean(candidate)&&all.indexOf(candidate)===position);
     const sourceKind=category==='musicvideos'?'thumbnail':category==='movies'||category==='tv'?'poster':'cover';
-    return [{id:`${category}:apple-chart:${country}:${id}`,category,title,subtitle,year:releaseDate.slice(0,4)||undefined,source,provider:source,sourceUrl,previewUrl:preview,imageUrl:image,sdDownloadUrl:preview,downloadUrl:hdDownloadUrls[0],hdDownloadUrls,kind:sourceKind,rights:'source-only'} as Artwork];
+    return [{id:`${category}:apple-chart:${country}:${id}`,category,title,subtitle,year:releaseDate.slice(0,4)||undefined,releaseDate,source,provider:source,sourceUrl,previewUrl:preview,imageUrl:image,sdDownloadUrl:preview,downloadUrl:hdDownloadUrls[0],hdDownloadUrls,kind:sourceKind,rights:'source-only'} as Artwork];
   });
 }
 function appleChartSnapshotKey(country:AppleStorefront,category:AppleCategory,kind:AppleChartKind){return `${country}/${category}/${kind}`;}
@@ -372,7 +372,7 @@ function loadAppleTrendSnapshot():Promise<AppleTrendSnapshot|null>{
   if(typeof document==='undefined')return Promise.resolve(null);
   if(!appleTrendSnapshotPromise){
     const base=import.meta.env?.BASE_URL||'/';
-    appleTrendSnapshotPromise=fetch(`${base}data/apple-trends.json`,{headers:{Accept:'application/json'}})
+    appleTrendSnapshotPromise=fetch(`${base}data/apple-trends.json`,{headers:{Accept:'application/json'},cache:'no-cache',signal:AbortSignal.timeout(5000)})
       .then(async response=>{
         if(!response.ok)return null;
         const snapshot=await response.json() as AppleTrendSnapshot;
