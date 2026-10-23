@@ -1,6 +1,129 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { appleArtworkSizedUrl, appleOriginalArtworkUrl, downloadLink, fetchAppleTrendArtwork, fetchAppleTrendArtworkWithAvailability, getAppleMotionArtwork, searchArtwork } from '../src/lib/providers.ts';
+import { readFileSync } from 'node:fs';
+import { appleArtworkSizedUrl, appleOriginalArtworkUrl, downloadLink, fetchAppleTrendArtwork, fetchAppleTrendArtworkWithAvailability, getAppleMotionArtwork, getMangaSeriesDetail, searchArtwork } from '../src/lib/providers.ts';
+import { fetchPublicChart } from '../src/lib/publicCharts.ts';
+
+test('physical media merges mirrored and indexed artwork for the same Wikidata entity',async()=>{
+  const originalFetch=globalThis.fetch,originalWindow=globalThis.window;
+  globalThis.window={location:{origin:'https://rupa.test'}};
+  globalThis.fetch=async input=>{
+    const url=new URL(typeof input==='string'?input:input.url||input,'https://rupa.test');
+    const relative=url.pathname.replace(/^\/offline\//,'');
+    try{return new Response(readFileSync(new URL('../public/offline/'+relative,import.meta.url)),{status:200,headers:{'content-type':'application/json'}});}
+    catch{return new Response('not found',{status:404});}
+  };
+  try{
+    const result=await searchArtwork('The Third Man','physicalmedia',undefined,undefined,'id','all');
+    const matches=result.results.filter(item=>item.title==='The Third Man');
+    assert.equal(matches.length,1);
+    assert.equal(matches[0].kind,'poster');
+  }finally{
+    globalThis.fetch=originalFetch;
+    if(originalWindow===undefined)delete globalThis.window;else globalThis.window=originalWindow;
+  }
+});
+
+test('AniList trend charts omit an unset status filter and return current anime works',async()=>{
+  const original=globalThis.fetch;let requestBody;
+  globalThis.fetch=async(_url,init)=>{
+    requestBody=JSON.parse(String(init?.body||'{}'));
+    return Response.json({data:{Page:{media:[{id:21,title:{userPreferred:'ONE PIECE'},coverImage:{extraLarge:'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21.jpg'},startDate:{year:1999,month:10,day:20},siteUrl:'https://anilist.co/anime/21/One-Piece/'}]}}});
+  };
+  try{
+    const items=await fetchPublicChart('anime','anilist','trending',new AbortController().signal);
+    assert.equal(requestBody.variables.type,'ANIME');
+    assert.equal('status' in requestBody.variables,false);
+    assert.doesNotMatch(requestBody.query,/status:/);
+    assert.equal(items[0].title,'ONE PIECE');
+    assert.equal(items[0].id,'anime:anilist:21');
+    assert.equal(items[0].category,'anime');
+    assert.equal(items[0].provider,'AniList');
+  }finally{globalThis.fetch=original;}
+});
+
+test('AniList search and chart resolve the same work id and source URL without the Worker',async()=>{
+  const original=globalThis.fetch;
+  const entry={id:21,title:{userPreferred:'ONE PIECE'},coverImage:{large:'https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/bx21.jpg',extraLarge:'https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx21.jpg'},startDate:{year:1999},siteUrl:'https://anilist.co/anime/21/One-Piece/'};
+  globalThis.fetch=async()=>Response.json({data:{Page:{media:[entry]}}});
+  try{
+    const chart=await fetchPublicChart('anime','anilist','trending',new AbortController().signal);
+    const search=await searchArtwork('One Piece AniList parity unique','anime',undefined,undefined,'us','anilist');
+    assert.equal(search.results[0].id,chart[0].id);
+    assert.equal(search.results[0].sourceUrl,chart[0].sourceUrl);
+    assert.equal(search.results[0].title,chart[0].title);
+    assert.equal(search.results[0].year,chart[0].year);
+    assert.equal(search.results[0].previewUrl,chart[0].previewUrl);
+    assert.equal(search.results[0].provider,chart[0].provider);
+  }finally{globalThis.fetch=original;}
+});
+
+test('MangaDex category search can fall back directly and maps its cover relationship',async()=>{
+  const original=globalThis.fetch;let requested;
+  globalThis.fetch=async input=>{
+    requested=new URL(typeof input==='string'?input:input.url||input);
+    return Response.json({data:[{id:'1234-abcd',attributes:{title:{en:'One Piece'},year:1997},relationships:[{id:'cover-1',type:'cover_art',attributes:{fileName:'cover.jpg'}}]}]});
+  };
+  try{
+    const result=await searchArtwork('One Piece MangaDex direct unique','manga',undefined,undefined,'id','mangadex');
+    assert.equal(requested.hostname,'api.mangadex.org');
+    assert.equal(requested.searchParams.get('contentRating[]'),'safe');
+    assert.equal(result.results[0].id,'manga:mangadex:1234-abcd');
+    assert.equal(result.results[0].title,'One Piece');
+    assert.equal(result.results[0].year,'1997');
+    assert.equal(result.results[0].imageUrl,'https://uploads.mangadex.org/covers/1234-abcd/cover.jpg.512.jpg');
+    assert.equal(result.results[0].previewUrl,'https://uploads.mangadex.org/covers/1234-abcd/cover.jpg.256.jpg');
+  }finally{globalThis.fetch=original;}
+});
+
+test('Manga detail passes a Jikan series ID to the Worker for an exact fallback lookup',async()=>{
+  const original=globalThis.fetch;let requested;
+  globalThis.fetch=async input=>{
+    requested=new URL(typeof input==='string'?input:input.url||input,'https://rupa.test');
+    return Response.json({id:'jikan:13',title:'One Piece',description:'',status:'Publishing',lastVolume:'',authors:[],source:'Jikan / MyAnimeList',sourceUrl:'https://myanimelist.net/manga/13',volumes:[],galleryLabel:'Related cover artwork'});
+  };
+  try{
+    const detail=await getMangaSeriesDetail('One Piece','manga:anilist:30013',new AbortController().signal,'Jikan / MyAnimeList','13');
+    assert.equal(requested.pathname,'/api/manga-detail');
+    assert.equal(requested.searchParams.get('title'),'One Piece');
+    assert.equal(requested.searchParams.get('malId'),'13');
+    assert.equal(detail.source,'Jikan / MyAnimeList');
+  }finally{globalThis.fetch=original;}
+});
+
+test('mixed public manga search publishes the first provider results while slower services continue',async()=>{
+  const original=globalThis.fetch,partial=[];
+  globalThis.fetch=async input=>{
+    const url=new URL(typeof input==='string'?input:input.url||input,'http://localhost');
+    if(url.hostname==='api.mangadex.org')throw new Error('MangaDex unavailable');
+    if(url.hostname==='api.jikan.moe'){
+      await new Promise(resolve=>setTimeout(resolve,120));
+      return Response.json({data:[{mal_id:421,title:'Later Manga',images:{jpg:{image_url:'https://cdn.test/later.jpg'}}}]});
+    }
+    if(url.hostname==='graphql.anilist.co')return Response.json({data:{Page:{media:[{id:43,title:{userPreferred:'Fast Manga'},coverImage:{large:'https://s4.anilist.co/fast.jpg'},siteUrl:'https://anilist.co/manga/43/Fast-Manga/'}]}}});
+    return new Response('{}',{status:404});
+  };
+  try{
+    const result=await searchArtwork('mixed partial manga search unique','manga',undefined,value=>partial.push(value), 'id','all');
+    assert.ok(partial.some(value=>value.results.some(item=>item.id==='manga:anilist:43')));
+    assert.ok(result.results.some(item=>item.id==='manga:jikan:421'));
+    assert.ok(result.warnings.some(warning=>warning.includes('MangaDex')));
+  }finally{globalThis.fetch=original;}
+});
+
+test('AniList upcoming charts apply the unreleased status filter explicitly',async()=>{
+  const original=globalThis.fetch;let requestBody;
+  globalThis.fetch=async(_url,init)=>{
+    requestBody=JSON.parse(String(init?.body||'{}'));
+    return Response.json({data:{Page:{media:[]}}});
+  };
+  try{
+    await fetchPublicChart('manga','anilist','upcoming',new AbortController().signal);
+    assert.equal(requestBody.variables.type,'MANGA');
+    assert.equal(requestBody.variables.status,'NOT_YET_RELEASED');
+    assert.match(requestBody.query,/status:\s*\$status/);
+  }finally{globalThis.fetch=original;}
+});
 
 test('Apple Music album search builds measured SD, HD, and max candidates from Apple CDN URLs',async()=>{
   const original=globalThis.fetch;let requested,calls=0;
@@ -87,7 +210,7 @@ test('each open Apple category uses the matching Search API media and entity',as
   const original=globalThis.fetch,requested=[];
   globalThis.fetch=async input=>{
     const url=new URL(typeof input==='string'?input:input.url||input);requested.push(url);
-    return Response.json({results:[{trackId:810,trackName:'Apple result',artistName:'Creator',releaseDate:'2024-01-02',artworkUrl100:'https://is1-ssl.mzstatic.com/image/thumb/Category/v4/ab/cd/ef/image.jpg/100x100bb.jpg',trackViewUrl:'https://music.apple.com/us/music-video/example/810'}]});
+    return Response.json({results:[{trackId:810,trackName:'Apple result',artistName:'Creator',releaseDate:'2024-01-02',artworkUrl100:'https://is1-ssl.mzstatic.com/image/thumb/Category/v4/ab/cd/ef/image.jpg/100x100bb.jpg',previewUrl:'https://video-ssl.itunes.apple.com/preview.m4v',trackViewUrl:'https://music.apple.com/us/music-video/example/810'}]});
   };
   const cases=[
     {category:'musicvideos',query:'Music video Apple source unique',media:'musicVideo',entity:'musicVideo',source:'Apple Music'},
@@ -111,6 +234,7 @@ test('each open Apple category uses the matching Search API media and entity',as
       assert.equal(record.source,item.source);
       assert.equal(record.previewUrl,'https://is1-ssl.mzstatic.com/image/thumb/Category/v4/ab/cd/ef/image.jpg/600x600bb.jpg');
       assert.equal(record.downloadUrl,'https://a5.mzstatic.com/us/r1000/0/Category/v4/ab/cd/ef/image.jpg');
+      assert.equal(record.mediaPreviewUrl,item.category==='musicvideos'?'https://video-ssl.itunes.apple.com/preview.m4v':undefined);
       assert.equal(record.rights,'source-only');
     }
   }finally{globalThis.fetch=original;}

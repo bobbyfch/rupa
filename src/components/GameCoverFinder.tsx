@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { ArrowLeft, ArrowRight, Gamepad2, Info, LoaderCircle, Search } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ChevronDown, Database, Gamepad2, Info, LoaderCircle, Search } from 'lucide-react';
 import type { Artwork } from '../lib/types';
 import { browseGamePlatform, groupGameArtworks, loadManifest, normalizeText, searchGameIndex, searchModernGameIndex, MODERN_GAME_PLATFORMS } from '../lib/catalog';
 import type { GameAssetFilter, IndexManifest, PlatformBrowse } from '../lib/catalog';
@@ -10,6 +10,7 @@ import { GameTrendingPanel } from './GameTrendingPanel';
 const GameSourceIndex = lazy(() => import('./GameSourceIndex').then(module => ({ default: module.GameSourceIndex })));
 
 const initialPlatform = () => new URLSearchParams(window.location.search).get('platform') || 'all';
+type TrendingGame = { rank: number; appId: number; title: string; image: string; sourceUrl: string; source: string };
 
 export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, onOpen, onBack }: {
   initialQuery?: string;
@@ -22,7 +23,6 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
   const [manifestError, setManifestError] = useState('');
   const [query, setQuery] = useState(initialQuery);
   const [platform, setPlatform] = useState(initialPlatform);
-  const [assetFilter, setAssetFilter] = useState<GameAssetFilter>('covers');
   const [results, setResults] = useState<Artwork[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState('');
@@ -31,8 +31,10 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
   const [visibleCount, setVisibleCount] = useState(72);
   const [failedImages, setFailedImages] = useState<Set<string>>(() => new Set());
   const [detailGroup,setDetailGroup]=useState<ReturnType<typeof groupGameArtworks>[number]|null>(null);
-  const [showSources,setShowSources]=useState(false);
+  const [sourcePanelOpen,setSourcePanelOpen]=useState(false);
+  const [sourcePanelLoaded,setSourcePanelLoaded]=useState(false);
   const [browseMeta,setBrowseMeta]=useState<PlatformBrowse|null>(null);
+  const [heroImages,setHeroImages]=useState<string[]>([]);
   const request = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -43,15 +45,40 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
     return () => { controller.abort(); request.current?.abort(); };
   }, []);
 
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`${import.meta.env.BASE_URL}data/games-trending.json`, { signal: controller.signal, cache: 'force-cache', headers: { Accept: 'application/json' } })
+      .then(response => response.ok ? response.json() : Promise.reject(new Error('Game chart snapshot unavailable')))
+      .then(data => {
+        if (controller.signal.aborted) return;
+        const chartIndex = data?.charts && typeof data.charts === 'object' ? data.charts as Record<string, { items?: { title?: string; image?: string }[] }> : {};
+        const charts = [chartIndex.top_sellers, chartIndex.most_played].filter((chart): chart is { items?: { title?: string; image?: string }[] } => Boolean(chart));
+        const images = [...new Set(charts.flatMap(chart => chart.items || [])
+          .filter(item => !/\b(?:adult|erotic|hentai|nsfw|sex|waifu)\b/i.test(item.title || ''))
+          .map(item => item.image)
+          .filter((image): image is string => Boolean(image)))];
+        for (let index = images.length - 1; index > 0; index--) {
+          const swapIndex = Math.floor(Math.random() * (index + 1));
+          [images[index], images[swapIndex]] = [images[swapIndex], images[index]];
+        }
+        setHeroImages(images.slice(0, 5));
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+
   const platforms = useMemo(() => (manifest?.shards || [])
     .filter(shard => shard.kind === 'games')
     .map(shard => ({ id: shard.platform || shard.id.replace(/^games-/, ''), label: shard.label || shard.platform || shard.id }))
     .concat(MODERN_GAME_PLATFORMS.map(item=>({id:item.id,label:item.label}))).sort((a, b) => a.label.localeCompare(b.label)), [manifest]);
+  const gameShards = (manifest?.shards || []).filter(shard => shard.kind === 'games');
+  const classicRecordCount = gameShards.reduce((total, shard) => total + shard.rows, 0);
   const groupedResults = useMemo(() => groupGameArtworks(results), [results]);
 
-  const runSearch = useCallback(async (value: string, selectedPlatform: string, selectedAssets: GameAssetFilter = assetFilter) => {
+  const runSearch = useCallback(async (value: string, selectedPlatform: string): Promise<ReturnType<typeof groupGameArtworks>> => {
+    const selectedAssets: GameAssetFilter = 'covers';
     const term = value.trim();
-    if (term.length < 2) { setError('Enter at least two characters, a game title, or a full game code.'); setResults([]); setSearched(false); return; }
+    if (term.length < 2) { setError('Enter at least two characters, a game title, or a full game code.'); setResults([]); setSearched(false); return []; }
     request.current?.abort();
     const controller = new AbortController(); request.current = controller;
     setBrowseMeta(null);
@@ -64,6 +91,8 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
       if (platformMatch) {
         const modern = await searchModernGameIndex(cleanTerm, platformMatch.id, selectedAssets, controller.signal);
         if (!controller.signal.aborted) setResults(modern);
+        if (controller.signal.aborted) return [];
+        return groupGameArtworks(modern);
       } else if (selectedPlatform === 'all') {
         let classicResults: Artwork[] = [];
         let modernResults: Artwork[] = [];
@@ -80,13 +109,14 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
         });
         const modernSearch = searchModernGameIndex(cleanTerm, 'all', selectedAssets, controller.signal);
         const [classicOutcome, modernOutcome] = await Promise.allSettled([classicSearch, modernSearch]);
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted) return [];
         if (classicOutcome.status === 'fulfilled') classicResults = classicOutcome.value;
         else setWarnings(current => current.includes('Classic console indexes could not be loaded.') ? current : [...current, 'Classic console indexes could not be loaded.']);
         if (modernOutcome.status === 'fulfilled') modernResults = modernOutcome.value;
         else setWarnings(current => current.includes('Modern game sources could not be reached.') ? current : [...current, 'Modern game sources could not be reached.']);
         publishCombined();
         if (classicOutcome.status === 'rejected' && modernOutcome.status === 'rejected') throw classicOutcome.reason;
+        return groupGameArtworks([...new Map([...classicResults, ...modernResults].map(item => [item.id, item])).values()]);
       } else {
         const hits = await searchGameIndex(term, {
           platform: selectedPlatform === 'all' ? undefined : selectedPlatform,
@@ -98,17 +128,21 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
         if (!controller.signal.aborted) {
           setResults(hits);
         }
+        if (controller.signal.aborted) return [];
+        return groupGameArtworks(hits);
       }
     } catch (reason) {
       if (timedOut) setError('Search timed out. Choose one console family or try again.');
       else if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'The game index could not be searched.');
+      return [];
     } finally {
       window.clearTimeout(timeoutId);
       if (request.current === controller) setLoading(false);
     }
-  }, [assetFilter]);
+  }, []);
 
-  const browsePlatform = useCallback(async (selectedPlatform: string, selectedAssets: GameAssetFilter = assetFilter) => {
+  const browsePlatform = useCallback(async (selectedPlatform: string) => {
+    const selectedAssets: GameAssetFilter = 'covers';
     request.current?.abort();
     const controller = new AbortController(); request.current = controller;
     setLoading(true); setError(''); setWarnings([]); setResults([]); setFailedImages(new Set()); setSearched(true); setBrowseMeta(null); setVisibleCount(72);
@@ -122,7 +156,7 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
       window.clearTimeout(timeoutId);
       if (request.current === controller) setLoading(false);
     }
-  }, [assetFilter]);
+  }, []);
 
   const selectPlatform = useCallback((selectedPlatform: string) => {
     setPlatform(selectedPlatform);
@@ -133,8 +167,8 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
 
   useEffect(() => {
     const selectedPlatform = initialPlatform();
-    if (initialQuery.trim().length >= 2) void runSearch(initialQuery, selectedPlatform, assetFilter);
-    else if (selectedPlatform !== 'all') void browsePlatform(selectedPlatform, assetFilter);
+    if (initialQuery.trim().length >= 2) void runSearch(initialQuery, selectedPlatform);
+    else if (selectedPlatform !== 'all') void browsePlatform(selectedPlatform);
   }, []); // Opened links with a query or platform can be shared and opened directly.
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -148,14 +182,23 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
   }
 
   const toggleFailed = (id: string) => setFailedImages(current => new Set(current).add(id));
+  async function openTrendingGame(game:TrendingGame){
+    setQuery(game.title);setPlatform('all');
+    const groups=await runSearch(game.title,'all');
+    const appId=String(game.appId);
+    const exact=groups.find(group=>group.editions.some(item=>item.mediaId===appId))
+      ||groups.find(group=>normalizeText(group.title)===normalizeText(game.title));
+    const chartArtwork:Artwork={id:`steam:${game.appId}:chart-cover`,category:'games',title:game.title,subtitle:'PC · Steam chart',source:'Steam Store',provider:'Steam Store API',sourceUrl:game.sourceUrl,imageUrl:game.image,previewUrl:game.image,downloadUrl:game.image,mediaId:appId,editionId:`steam:${game.appId}`,kind:'cover',rights:'source-only',availability:'link-only'};
+    setDetailGroup(exact?{...exact,editions:[chartArtwork,...exact.editions.filter(item=>item.mediaId!==appId)],platforms:[...new Set([...exact.platforms,'PC'])]}:{id:normalizeText(game.title),title:game.title,editions:[chartArtwork],platforms:['PC']});
+    const url=new URL(window.location.href);url.search='';url.searchParams.set('view','games');url.searchParams.set('q',game.title);window.history.replaceState(null,'',url);
+    window.scrollTo({top:0,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+  }
   if(detailGroup)return <GameDetailPage group={detailGroup} favoriteIds={favoriteIds} onBack={()=>setDetailGroup(null)} onOpen={onOpen} onFavorite={onFavorite} onPlatformBrowse={id=>{setDetailGroup(null);setQuery('');setPlatform(id);void browsePlatform(id);}}/>;
-  if(showSources)return <Suspense fallback={<div className="content-width game-source-loading" role="status"><LoaderCircle size={18} className="game-finder-spinner"/> Opening the Games source map…</div>}><GameSourceIndex onOpenGames={(selectedPlatform,term)=>{setShowSources(false);setPlatform(selectedPlatform||'all');if(term){setQuery(term);void runSearch(term,selectedPlatform||'all');}}}/></Suspense>;
   return <section className="content-width search-content game-finder-page" aria-labelledby="game-finder-title">
     <button type="button" className="back-to-collections" onClick={onBack}><ArrowLeft size={16}/> Categories</button>
     <div className="listing-header game-finder-header">
-      <div className="tiny-kicker">CATEGORY / GAME ARCHIVE</div>
-      <h1 id="game-finder-title">Games<br/><em>in view.</em></h1>
-      <p>Find a game across its editions, consoles, and visual assets. Search by title or product code.</p>
+      <div className="game-finder-title"><div className="tiny-kicker">CATEGORY / GAME ARCHIVE</div><h1 id="game-finder-title">Games<br/><em>in view.</em></h1><p>Find a game across its editions, consoles, and visual assets. Search by title or product code.</p></div>
+      <aside className="game-finder-overview" aria-label="Game archive coverage"><div className="game-finder-art-ribbon" aria-hidden="true">{heroImages.map((image,index)=><span key={`${image}-${index}`}><img src={image} alt="" loading={index>1?'lazy':'eager'} decoding="async"/></span>)}</div><span className="tiny-kicker">ARCHIVE COVERAGE</span><div className="game-finder-overview-count"><strong>{platforms.length||MODERN_GAME_PLATFORMS.length}</strong><span>systems mapped</span></div><div className="game-finder-overview-stats"><span><b>{classicRecordCount.toLocaleString()}</b> classic title records</span><span><b>{MODERN_GAME_PLATFORMS.length}</b> modern catalogs</span></div><div className="game-finder-overview-tags"><span>Covers</span><span>Gameplay</span><span>Logos</span><span>Publisher art</span></div></aside>
     </div>
     <form className="game-finder-search" onSubmit={submit}>
       <label className="game-search-label" htmlFor="game-cover-query">GAME TITLE OR PRODUCT CODE</label>
@@ -163,24 +206,14 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
       <div className="console-choice"><span className="game-search-label">CHOOSE A CONSOLE · BROWSE BY PLATFORM FAMILY</span><GameConsoleSelector options={platforms} value={platform} onChange={selectPlatform}/></div>
       <div className="game-search-controls"><Button type="submit" disabled={loading}>{loading ? 'Searching…' : 'Search'} <ArrowRight size={16}/></Button></div>
     </form>
-    <div className="game-asset-filters" role="group" aria-label="Game artwork type">{([['covers','Covers'],['screenshots','Gameplay'],['wallpapers','Wallpapers'],['artworks','Publisher art'],['logos','Logos'],['icons','Icons'],['title-screens','Title screens'],['all','All assets']] as [GameAssetFilter,string][]).map(([id,label])=><button type="button" key={id} className={assetFilter===id?'active':''} aria-pressed={assetFilter===id} onClick={()=>{setAssetFilter(id);if(query.trim().length>=2)void runSearch(query,platform,id);else if(browseMeta&&platform!=='all')void browsePlatform(platform,id);}}>{label}</button>)}</div>
     <div className="game-finder-hints">
       <span>Try</span>
       {['Mario GBA', 'Zelda N64', 'Final Fantasy X PS2', 'PCSE00628'].map(example => <button type="button" key={example} onClick={() => { setQuery(example); void runSearch(example, 'all'); }}>{example}</button>)}
     </div>
-    {!searched && <GameTrendingPanel onSelect={game => {
-      setQuery(game.title);
-      setDetailGroup({ id: normalizeText(game.title), title: game.title, editions: [{ id: `steam:${game.appId}:cover`, category: 'games', title: game.title, subtitle: 'PC · Steam chart', source: 'Steam Store', provider: 'Steam Store API', sourceUrl: game.sourceUrl, imageUrl: game.image, previewUrl: game.image, downloadUrl: game.image, mediaId: String(game.appId), editionId: `steam:${game.appId}`, kind: 'cover', rights: 'source-only', availability: 'link-only' }], platforms: ['PC'] });
-      const url = new URL(window.location.href);
-      url.searchParams.set('view', 'games');
-      url.searchParams.set('q', game.title);
-      window.history.replaceState(null, '', url);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }}/>}
-    <div className="game-finder-source"><Info size={15}/><span>Classic and modern platform indexes, trending games, metadata, and image sources live inside this category.</span><button type="button" onClick={()=>setShowSources(true)}>Browse all game sources <ArrowRight size={14}/></button></div>
+    {!searched && <GameTrendingPanel onSelect={game => { void openTrendingGame(game); }}/>}
     {manifestError && <div className="search-warning" role="status"><Info size={16}/><span>Console list unavailable. {manifestError}</span></div>}
     {browseMeta&&<div className="game-platform-browse-heading"><div><span className="tiny-kicker">{browseMeta.sourceLabel}</span><h2>{browseMeta.items.length ? browseMeta.heading : 'No indexed titles yet'}</h2><p>{browseMeta.items.length ? 'Select a title to open its details and artwork.' : 'This platform index has no current game records. Search by title or browse the platform store.'}</p></div><a href={browseMeta.sourceUrl} target="_blank" rel="noreferrer">Open official catalog <ArrowRight size={14}/></a></div>}
-    <div className="results-head" aria-live="polite" aria-atomic="true"><span>{searched ? `${groupedResults.length} GAMES · ${results.length} ${assetFilter==='all'?'ASSETS':assetFilter.toUpperCase().replace('-',' ')}` : 'READY TO SEARCH'}</span><span>{platform === 'all' ? '23 SYSTEMS' : platforms.find(item => item.id === platform)?.label.toUpperCase() || 'CONSOLE INDEX'}</span></div>
+    <div id="game-results" className="results-head" aria-live="polite" aria-atomic="true"><span>{searched ? `${groupedResults.length} GAMES · ${results.length} COVERS` : 'READY TO SEARCH'}</span><span>{platform === 'all' ? `${platforms.length} SYSTEMS` : platforms.find(item => item.id === platform)?.label.toUpperCase() || 'CONSOLE INDEX'}</span></div>
     {warnings.length > 0 && <div className="search-warning" role="status" aria-live="polite"><Info size={16}/><span>Some indexes could not be reached: {warnings.join(' · ')}</span></div>}
     {loading && results.length === 0 && <div className="game-finder-empty" role="status"><LoaderCircle size={18} className="game-finder-spinner"/><span>Searching the selected console indexes…</span></div>}
     {!loading && error && <div className="game-finder-empty"><strong>Search needs a little more detail</strong><span>{error}</span></div>}
@@ -201,6 +234,7 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
       })}
     </div>}
     {groupedResults.length > visibleCount && <div className="ghibli-more"><Button variant="outline" onClick={() => setVisibleCount(count => count + 72)}>Load more games <span>({groupedResults.length - visibleCount} remaining)</span></Button></div>}
-    <p className="game-finder-footnote">The indexed Libretro thumbnails are capped at 512 px wide. SteamGridDB and LaunchBox open separate catalogs for additional artwork; their results are not merged into Rupa’s index.</p>
+    <p className="game-finder-footnote">Connected feeds can be searched here. Catalogs without a supported feed are linked in the coverage details below.</p>
+    <details className="game-source-disclosure" open={sourcePanelOpen} onToggle={event=>{const open=event.currentTarget.open;setSourcePanelOpen(open);if(open)setSourcePanelLoaded(true);}}><summary><span className="game-source-disclosure-icon"><Database size={17}/></span><span className="game-source-disclosure-copy"><strong>Platform &amp; image coverage</strong><small>Systems, active feeds, and the catalogs behind results</small></span><ChevronDown size={18} className="game-source-disclosure-chevron"/></summary>{sourcePanelLoaded&&<Suspense fallback={<div className="game-source-loading" role="status"><LoaderCircle size={18} className="game-finder-spinner"/> Loading source coverage…</div>}><GameSourceIndex query={query} onOpenGames={(selectedPlatform,term)=>{setSourcePanelOpen(false);const selected=selectedPlatform||'all',searchTerm=(term||query).trim();setPlatform(selected);if(searchTerm){setQuery(searchTerm);void runSearch(searchTerm,selected);}else if(selected!=='all')void browsePlatform(selected);document.getElementById('game-results')?.scrollIntoView({behavior:'smooth',block:'start'});}}/></Suspense>}</details>
   </section>;
 }

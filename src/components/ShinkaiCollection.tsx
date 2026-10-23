@@ -64,6 +64,17 @@ export function ShinkaiCollection({ onBrowseAnime, onBack, favoriteIds, onFavori
   }, [attempt]);
 
   const orderedFilms = useMemo(() => [...films].sort((a, b) => b.year - a.year || a.title.localeCompare(b.title)), [films]);
+  const heroImages = useMemo(() => {
+    const images = [...new Set(orderedFilms.flatMap(film => {
+      const source = assets.find(entry => entry.filmId === film.id);
+      return [source?.poster, film.image, ...(source?.stills || []).map(still => still.image)].filter((image): image is string => Boolean(image));
+    }))];
+    for (let index = images.length - 1; index > 0; index--) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [images[index], images[swapIndex]] = [images[swapIndex], images[index]];
+    }
+    return images.slice(0, 5);
+  }, [assets, orderedFilms]);
   const selectedFilm = orderedFilms.find(film => film.id === filmFilter);
   const selectedAssets = selectedFilm ? assets.find(entry => entry.filmId === selectedFilm.id) : undefined;
   const filteredFilms = selectedFilm ? [selectedFilm] : orderedFilms;
@@ -86,7 +97,7 @@ export function ShinkaiCollection({ onBrowseAnime, onBack, favoriteIds, onFavori
 
   return <section className="content-width shinkai-page ghibli-page" aria-labelledby="shinkai-title">
     <button className="back-to-collections" type="button" onClick={onBack}><ArrowLeft size={16}/> Collections</button>
-    <header className="shinkai-header ghibli-header"><div><span className="hero-kicker"><span className="hero-kicker-line"/> COLLECTION / ANIMATION</span><h1 id="shinkai-title">Makoto Shinkai</h1><p>Films, posters, and image galleries linked to official film sites and the Makoto Shinkai Works archive.</p></div><div className="ghibli-count"><strong>{totalStills.toLocaleString()}</strong><span>OFFICIAL IMAGE LINKS / {films.length || 9} FILMS</span><small>{assets.length} film galleries · {exhibitions.length} exhibition records</small><a href={FILMOGRAPHY_URL} target="_blank" rel="noreferrer">Official filmography <ArrowUpRight size={14}/></a></div></header>
+    <header className="shinkai-header ghibli-header category-immersive-hero collection-immersive-hero"><div className="category-immersive-art" aria-hidden="true">{heroImages.map((image, index) => <span key={`${image}-${index}`}><img src={image} alt="" loading={index > 1 ? 'lazy' : 'eager'} decoding="async"/></span>)}</div><div><span className="hero-kicker"><span className="hero-kicker-line"/> COLLECTION / ANIMATION</span><h1 id="shinkai-title">Makoto Shinkai</h1><p>Films, posters, and image galleries linked to official film sites and the Makoto Shinkai Works archive.</p></div><div className="ghibli-count"><strong>{totalStills.toLocaleString()}</strong><span>OFFICIAL IMAGE LINKS / {films.length || 9} FILMS</span><small>{assets.length} film galleries · {exhibitions.length} exhibition records</small><a href={FILMOGRAPHY_URL} target="_blank" rel="noreferrer">Official filmography <ArrowUpRight size={14}/></a></div></header>
 
     <nav className="ghibli-quicknav" aria-label="Makoto Shinkai archive sections"><a href="#shinkai-timeline">Film timeline <ArrowDown size={13}/></a><a href="#shinkai-posters">Posters <span>{films.length}</span><ArrowDown size={13}/></a><a href="#shinkai-stills">Film stills <span>{totalStills}</span><ArrowDown size={13}/></a>{exhibitions.length > 0 && <a href="#shinkai-exhibitions">Exhibitions <span>{exhibitions.length}</span><ArrowDown size={13}/></a>}</nav>
 

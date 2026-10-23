@@ -4,6 +4,8 @@ import path from 'node:path';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
+import { onRequestGet as getLocalSearch } from './worker/src/search.js';
+import { onRequestGet as getLocalMangaDetail } from './worker/src/manga-detail.js';
 import { onRequestGet as getLocalImage } from './worker/src/image.js';
 const LOCAL_HEXFLOW_ROOT=fileURLToPath(new URL('./.local-only/source-mirrors/hexflow-covers',import.meta.url));
 const normalizeLocalTitle=(value:string)=>value.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
@@ -88,6 +90,27 @@ function localImageProxy() {
   };
   return { name: 'rupa-local-image-proxy', configureServer(server: any) { server.middlewares.use(handler); }, configurePreviewServer(server: any) { server.middlewares.use(handler); } };
 }
+// Reuse the production search Worker in local development so browser-only CORS rules do not hide usable feeds.
+function localSearchProxy() {
+  const handler = async (req: any, res: any, next: any) => {
+    if (!req.url?.startsWith('/api/search') && !req.url?.startsWith('/api/manga-detail')) return next();
+    if (req.method !== 'GET') { res.statusCode = 405; return res.end(); }
+    try {
+      const request = new Request(new URL(req.url, 'http://localhost').toString(), { method: 'GET' });
+      const response = req.url.startsWith('/api/manga-detail')
+        ? await getLocalMangaDetail({ request, env: {} } as any)
+        : await getLocalSearch({ request, env: {} } as any);
+      res.statusCode = response.status;
+      response.headers.forEach((value, name) => res.setHeader(name, value));
+      res.end(Buffer.from(await response.arrayBuffer()));
+    } catch {
+      res.statusCode = 502;
+      res.setHeader('content-type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'Search proxy could not complete the request.' }));
+    }
+  };
+  return { name: 'rupa-local-search-proxy', configureServer(server: any) { server.middlewares.use(handler); }, configurePreviewServer(server: any) { server.middlewares.use(handler); } };
+}
 // GitHub Pages cannot set response headers, so the production page carries its policy in a meta tag.
 // script-src allows itunes.apple.com because the Apple Search fallback uses JSONP. Dev is left open for Vite's inline HMR scripts.
 function productionCsp() {
@@ -101,5 +124,5 @@ function productionCsp() {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const base = env.VITE_BASE_PATH || (env.GITHUB_REPOSITORY && !env.GITHUB_REPOSITORY.endsWith('.github.io') ? `/${env.GITHUB_REPOSITORY.split('/')[1]}/` : '/');
-  return { base, plugins: [react(), tailwindcss(), localHexflowMiddleware(), localCovers(), localImageProxy(), productionCsp()], resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } }, server: { port: 5173 } };
+  return { base, plugins: [react(), tailwindcss(), localHexflowMiddleware(), localCovers(), localSearchProxy(), localImageProxy(), productionCsp()], resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } }, server: { port: 5173 } };
 });

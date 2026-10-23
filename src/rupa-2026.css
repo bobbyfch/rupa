@@ -161,7 +161,7 @@ button, input, select { font: inherit; }
 .skeleton-grid.gallery-masonry .skeleton-art, .skeleton-grid.gallery-grid .skeleton-art { border-radius: 2px; }
 .skeleton-art[data-art-category="music"], .skeleton-art[data-art-category="apps"], .skeleton-art[data-art-category="podcasts"] { aspect-ratio: 1 / 1; }
 .skeleton-art[data-art-category="books"], .skeleton-art[data-art-category="audiobooks"], .skeleton-art[data-art-category="movies"], .skeleton-art[data-art-category="tv"], .skeleton-art[data-art-category="games"] { aspect-ratio: 2 / 3; }
-.skeleton-art[data-art-category="musicvideos"], .skeleton-art[data-art-category="videos"], .skeleton-art[data-art-category="appscreenshots"] { aspect-ratio: 16 / 9; }
+.skeleton-art[data-art-category="musicvideos"], .skeleton-art[data-art-category="videos"] { aspect-ratio: 16 / 9; }
 .skeleton-grid.gallery-masonry .skeleton-art[data-art-category="music"], .skeleton-grid.gallery-masonry .skeleton-art[data-art-category="apps"], .skeleton-grid.gallery-masonry .skeleton-art[data-art-category="podcasts"] { aspect-ratio: 1 / 1; }
 .skeleton-grid.gallery-masonry .skeleton-art[data-art-category="books"], .skeleton-grid.gallery-masonry .skeleton-art[data-art-category="audiobooks"] { aspect-ratio: 2 / 3; }
 .skeleton-art { display: grid; place-items: center; }

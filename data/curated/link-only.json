@@ -1,5 +1,5 @@
 {
-  "note": "Archives RUPA links to and never copies from (docs/RUPA_SOURCE_MAP.md section G.5). Each is named, linked and credited; takedown and rights questions go to the archive itself.",
+  "note": "This list records public image archives that Rupa links to but does not copy from. Each archive is named and linked; rights questions belong with the archive.",
   "archives": [
     { "name": "IMP Awards", "url": "https://www.impawards.com/", "categories": ["movies"], "about": "Film posters by year" },
     { "name": "Posteritati", "url": "https://posteritati.com/", "categories": ["movies", "physicalmedia"], "about": "Vintage and international film posters" },

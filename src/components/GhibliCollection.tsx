@@ -48,6 +48,14 @@ export function GhibliCollection({ favoriteIds, onFavorite, onOpen, onBack }: { 
   }, []);
 
   const orderedFilms = useMemo(() => [...films].sort((a, b) => (b.releaseDate || '').localeCompare(a.releaseDate || '') || b.id.localeCompare(a.id)), [films]);
+  const heroImages = useMemo(() => {
+    const images = [...new Set(orderedFilms.flatMap(film => [film.posterUrl, film.posterEditions?.[0]?.imageUrl, ...film.stills.map(still => still.thumbnailUrl)].filter((image): image is string => Boolean(image))))];
+    for (let index = images.length - 1; index > 0; index--) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [images[index], images[swapIndex]] = [images[swapIndex], images[index]];
+    }
+    return images.slice(0, 5);
+  }, [orderedFilms]);
   const years = useMemo(() => [...new Set(orderedFilms.flatMap(film => film.year ? [film.year] : []))].sort((a, b) => b - a), [orderedFilms]);
   const selectedFilm = orderedFilms.find(film => film.id === filmFilter);
   const regionalPosters = useMemo<PosterEntry[]>(() => orderedFilms.flatMap(film => (film.posterEditions || []).map(edition => ({ film, edition }))), [orderedFilms]);
@@ -73,7 +81,8 @@ export function GhibliCollection({ favoriteIds, onFavorite, onOpen, onBack }: { 
 
   return <section className="content-width ghibli-page" aria-labelledby="ghibli-title">
     <button className="back-to-collections" type="button" onClick={onBack}><ArrowLeft size={16}/> Tools &amp; collections</button>
-    <div className="ghibli-header">
+    <div className="ghibli-header category-immersive-hero collection-immersive-hero">
+      <div className="category-immersive-art" aria-hidden="true">{heroImages.map((image, index) => <span key={`${image}-${index}`}><img src={image} alt="" loading={index > 1 ? 'lazy' : 'eager'} decoding="async"/></span>)}</div>
       <div><div className="hero-kicker"><span className="hero-kicker-line"/> RUPA / CURATED COLLECTION</div><h1 id="ghibli-title">Ghibli</h1><p>Browse 27 films, regional poster editions, and official stills. China editions are collected in the poster archive below.</p></div>
       <div className="ghibli-count"><strong>{totalStills.toLocaleString()}</strong><span>OFFICIAL STILLS / {films.length || 27} FILMS</span><small>{countLabel}</small><a href="https://www.ghibli.jp/works/" target="_blank" rel="noreferrer">Official works index <ArrowUpRight size={14}/></a></div>
     </div>

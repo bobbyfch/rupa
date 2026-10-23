@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, ArrowRight, ArrowUpRight, Database, Gamepad2, LoaderCircle, Search } from 'lucide-react';
+import { ArrowRight, ArrowUpRight, Database, Gamepad2, LoaderCircle } from 'lucide-react';
 import { loadManifest, MODERN_GAME_PLATFORMS, type IndexManifest } from '../lib/catalog';
-import { Button } from './ui/button';
 
 type GameSource = {
   id: string;
@@ -33,11 +32,10 @@ function urlFor(source: GameSource, query = 'game title') {
   return source.urlTemplate?.replace('{query}', encodeURIComponent(query)) || source.url || '#';
 }
 
-export function GameSourceIndex({ onOpenGames }: { onOpenGames: (platform?: string, query?: string) => void }) {
+export function GameSourceIndex({ query, onOpenGames }: { query: string; onOpenGames: (platform?: string, query?: string) => void }) {
   const [manifest, setManifest] = useState<IndexManifest | null>(null);
   const [data, setData] = useState<GameSourceData | null>(null);
   const [steamCount, setSteamCount] = useState(0);
-  const [query, setQuery] = useState('');
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
 
@@ -48,7 +46,7 @@ export function GameSourceIndex({ onOpenGames }: { onOpenGames: (platform?: stri
     Promise.all([
       loadManifest(controller.signal),
       fetch(`${base}data/game-art-sources.json`, { signal: controller.signal, cache: 'no-cache', headers: { Accept: 'application/json' } })
-        .then(response => { if (!response.ok) throw new Error('Game source index could not be loaded.'); return response.json() as Promise<GameSourceData>; }),
+        .then(response => { if (!response.ok) throw new Error('Game coverage data could not be loaded.'); return response.json() as Promise<GameSourceData>; }),
       fetch(`${base}offline/index/games-steam.json`, { signal: controller.signal, cache: 'no-cache', headers: { Accept: 'application/json' } })
         .then(response => response.ok ? response.json() as Promise<SteamIndex> : { games: [] }),
     ]).then(([nextManifest, nextData, steam]) => {
@@ -57,7 +55,7 @@ export function GameSourceIndex({ onOpenGames }: { onOpenGames: (platform?: stri
       setData(nextData);
       setSteamCount(steam.games?.length || 0);
     }).catch(reason => {
-      if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Game source index could not be loaded.');
+      if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'Game coverage data could not be loaded.');
     });
     return () => controller.abort();
   }, [attempt]);
@@ -85,20 +83,7 @@ export function GameSourceIndex({ onOpenGames }: { onOpenGames: (platform?: stri
   const platformLabel = (id: string) => id === 'classic' ? 'Classic systems' : id === 'modern' ? 'Modern systems' : MODERN_GAME_PLATFORMS.find(platform => platform.id === id)?.label || gameShards.find(shard => shard.platform === id)?.label || id.toUpperCase();
   const titleEntries = data?.entries || [];
 
-  return <section className="content-width search-content game-source-page" aria-labelledby="game-source-title">
-    <button type="button" className="back-to-collections" onClick={() => onOpenGames()}><ArrowLeft size={15}/> Game archive</button>
-    <header className="game-source-heading">
-      <div>
-        <span className="tiny-kicker">GAME INDEX / SOURCE MAP</span>
-        <h1 id="game-source-title">Games, by<br/><em>source.</em></h1>
-        <p>See which console families, title indexes, and image catalogs feed the game archive. Choose a platform to search its records; every image keeps a link to its host.</p>
-      </div>
-      <form className="game-source-search" onSubmit={event => { event.preventDefault(); onOpenGames(undefined, query.trim()); }}>
-        <label htmlFor="game-source-query">SEARCH THE GAME INDEX</label>
-        <div><Search size={18}/><input id="game-source-query" value={query} onChange={event => setQuery(event.target.value)} placeholder="Game title or product code"/><Button type="submit" disabled={query.trim().length < 2}>Search <ArrowRight size={15}/></Button></div>
-      </form>
-    </header>
-
+  return <div className="game-source-content">
     {error && <div className="search-warning" role="status"><Database size={16}/><span>{error}</span><button type="button" onClick={() => setAttempt(value => value + 1)}>Reload index</button></div>}
     {!manifest && !error ? <div className="game-source-loading" role="status"><LoaderCircle size={18} className="game-finder-spinner"/> Loading platform and source indexes…</div> : <>
       <div className="game-source-stats" aria-label="Indexed game coverage">
@@ -109,7 +94,7 @@ export function GameSourceIndex({ onOpenGames }: { onOpenGames: (platform?: stri
       </div>
 
       <section className="game-source-platforms" aria-labelledby="game-platforms-title">
-        <div className="game-source-section-head"><div><span className="tiny-kicker">BROWSE THE INDEX</span><h2 id="game-platforms-title">Console families</h2></div><p>Classic feeds are browsable by system. Modern systems query title and image metadata when you search.</p></div>
+        <div className="game-source-section-head"><div><span className="tiny-kicker">PLATFORM COVERAGE</span><h2 id="game-platforms-title">Console families</h2></div><p>Classic catalogs are browsable by system. Modern systems query title and image metadata from the same Games search.</p></div>
         <div className="game-source-family-grid">
           {platformGroups.map(({ family, platforms }) => <article className="game-source-family" key={family}>
             <div className="game-source-family-heading"><Gamepad2 size={17}/><h3>{family}</h3><span>{platforms.length} systems</span></div>
@@ -139,5 +124,5 @@ export function GameSourceIndex({ onOpenGames }: { onOpenGames: (platform?: stri
         {titleEntries.length ? titleEntries.map(entry => <article className="game-source-title-row" key={entry.matches.join('|')}><strong>{entry.matches.join(' · ')}</strong><div>{entry.sources.map(source => <a href={source.url} key={source.url} target="_blank" rel="noreferrer">{source.label}<small>{source.kind || 'Image source'}</small><ArrowUpRight size={13}/></a>)}</div></article>) : <p className="muted">No title-specific publisher feeds are configured yet.</p>}
       </section>
     </>}
-  </section>;
+  </div>;
 }

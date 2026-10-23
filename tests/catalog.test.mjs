@@ -314,7 +314,7 @@ test('audiobook index searches by title, author and language', () => {
   assert.ok(books[0].work.url.startsWith('https://librivox.org/'));
 });
 
-test('collections without any live provider and Worker-less manga are served from the offline catalog', async () => {
+test('collections without live providers remain offline and manga can explicitly use its offline index', async () => {
   const original = globalThis.fetch, requested = [];
   resetCatalogCache();
   globalThis.fetch = async input => {
@@ -323,11 +323,14 @@ test('collections without any live provider and Worker-less manga are served fro
     return new Response(readFileSync(new URL('../public/offline/' + url.pathname.split('/offline/').pop(), import.meta.url)), { status: 200 });
   };
   try {
-    for (const [category, query] of [['boardgames', 'chess'], ['magazines', 'time'], ['manga', 'one piece'], ['comics', 'garfield']]) {
+    for (const [category, query] of [['boardgames', 'chess'], ['magazines', 'time'], ['comics', 'garfield']]) {
       const result = await searchArtwork(query, category, undefined, undefined, 'us', 'all');
       assert.ok(result.results.length + result.warnings.length > 0, category);
       assert.ok(result.results.every(item => item.category === category), category);
     }
+    const manga = await searchArtwork('one piece', 'manga', undefined, undefined, 'us', 'local-index');
+    assert.ok(manga.results.length + manga.warnings.length > 0, 'manga offline index');
+    assert.ok(manga.results.every(item => item.category === 'manga'));
     assert.ok(requested.every(path => path.includes('/offline/')), requested.join());
   } finally { globalThis.fetch = original; resetCatalogCache(); }
 });

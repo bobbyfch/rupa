@@ -23,10 +23,13 @@ const sourceOptions: Partial<Record<Category, SourceOption[]>> = {
   movies: [
     { id: 'all', label: 'All sources' },
     { id: 'apple', label: 'Apple TV / iTunes' },
+    { id: 'cinemeta', label: 'Cinemeta posters' },
   ],
   tv: [
     { id: 'all', label: 'All sources' },
     { id: 'apple', label: 'Apple TV seasons' },
+    { id: 'cinemeta', label: 'Cinemeta posters' },
+    { id: 'tvmaze', label: 'TVmaze' },
   ],
   art: [
     { id: 'all', label: 'All sources' },
@@ -40,13 +43,13 @@ const sourceOptions: Partial<Record<Category, SourceOption[]>> = {
     { id: 'all', label: 'Best available' },
     { id: 'local-index', label: 'Offline title index', note: 'Works without the Worker' },
     { id: 'jikan', label: 'Jikan / MyAnimeList' },
-    { id: 'anilist', label: 'AniList', note: 'Rate limited' },
+    { id: 'anilist', label: 'AniList' },
   ],
   manga: [
     { id: 'all', label: 'Best available' },
     { id: 'mangadex', label: 'MangaDex' },
     { id: 'jikan', label: 'Jikan / MyAnimeList' },
-    { id: 'anilist', label: 'AniList', note: 'Rate limited' },
+    { id: 'anilist', label: 'AniList' },
   ],
   webtoons: [
     { id: 'all', label: 'All sources' },
@@ -63,16 +66,15 @@ const sourceOptions: Partial<Record<Category, SourceOption[]>> = {
     { id: 'youtube', label: 'YouTube link / ID' },
   ],
   musicvideos: [{ id: 'all', label: 'All sources' }, { id: 'apple', label: 'Apple Music' }],
-  audiobooks: [{ id: 'all', label: 'All sources' }, { id: 'apple', label: 'Apple Books' }],
+  audiobooks: [{ id: 'all', label: 'All sources' }, { id: 'apple', label: 'Apple Books' }, { id: 'librivox', label: 'LibriVox' }],
   podcasts: [{ id: 'all', label: 'All sources' }, { id: 'apple', label: 'Apple Podcasts' }],
   podcastepisodes: [{ id: 'all', label: 'All sources' }, { id: 'apple', label: 'Apple Podcasts' }],
-  apps: [{ id: 'all', label: 'All sources' }, { id: 'apple', label: 'App Store' }],
-  appscreenshots: [{ id: 'all', label: 'All sources' }, { id: 'apple', label: 'App Store' }],
+  apps: [{ id: 'all', label: 'All sources' }, { id: 'apple', label: 'App Store' }, { id: 'fdroid', label: 'F-Droid' }],
 };
 
 export const SEARCHABLE_COLLECTIONS: Category[] = [
   'music', 'musicvideos', 'books', 'audiobooks', 'podcasts', 'podcastepisodes',
-  'apps', 'appscreenshots', 'movies', 'tv', 'art', 'anime', 'manga', 'webtoons', 'comics', 'games', 'boardgames', 'magazines', 'physicalmedia', 'videos',
+  'apps', 'movies', 'tv', 'art', 'anime', 'manga', 'webtoons', 'comics', 'games', 'boardgames', 'magazines', 'physicalmedia', 'videos',
 ];
 
 export function isSearchableCollection(category: Category): boolean {

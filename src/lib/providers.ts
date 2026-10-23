@@ -1,12 +1,28 @@
-import type { AppleCategory, AppleStorefront, Artwork, Category, MotionArtwork, ProviderResult } from './types';
+import type { AppleCategory, AppleStorefront, Artwork, Category, MangaSeriesDetail, MotionArtwork, ProviderResult } from './types';
 import { APPLE_STOREFRONTS } from './appleStorefronts.ts';
 import appleChartFeeds from './appleChartFeeds.json' with { type: 'json' };
 import { artworkMatches, hasTitleIndex, searchAnimeIndex, searchGameIndex, searchTitleArtworks } from './catalog.ts';
 const backend = (import.meta.env?.VITE_API_URL || '').replace(/\/$/, '');
 const API_REQUEST_TIMEOUT_MS=15_000;
+const MANGA_DETAIL_REQUEST_TIMEOUT_MS=28_000;
 const APPLE_SEARCH_TIMEOUT_MS=10_000;
 export const hasBackend = Boolean(backend);
 export const apiUrl = (path:string) => `${backend}${path}`;
+export async function getMangaSeriesDetail(title:string,id:string|undefined,signal:AbortSignal,provider?:string,mediaId?:string):Promise<MangaSeriesDetail>{
+ const params=new URLSearchParams();
+ const mangaDexId=id?.startsWith('manga:mangadex:')?id.slice('manga:mangadex:'.length):'';
+ if(mangaDexId)params.set('id',mangaDexId);
+ params.set('title',title.slice(0,180));
+ if(provider==='Jikan / MyAnimeList'&&/^\d+$/.test(mediaId||''))params.set('malId',mediaId!);
+ const timeout=AbortSignal.timeout(MANGA_DETAIL_REQUEST_TIMEOUT_MS),requestSignal=AbortSignal.any([signal,timeout]);
+ let response:Response;
+ try{response=await fetch(apiUrl('/api/manga-detail')+'?'+params.toString(),{signal:requestSignal,headers:{Accept:'application/json'}});}
+ catch(error){if(signal.aborted)throw error;if(timeout.aborted)throw new Error('Loading manga artwork took too long. Try again.');throw new Error(hasBackend?'Manga artwork sources are temporarily unavailable.':'Connect the RUPA Worker to load manga artwork.');}
+ const payload=await response.json().catch(()=>null) as unknown;
+ if(!response.ok){const message=payload&&typeof payload==='object'&&'error'in payload?String((payload as {error?:unknown}).error||''):'';throw new Error(message||`Manga artwork sources returned HTTP ${response.status}.`);}
+ if(!payload||typeof payload!=='object'||!Array.isArray((payload as MangaSeriesDetail).volumes)||typeof (payload as MangaSeriesDetail).title!=='string')throw new Error('Manga sources returned an incomplete series record.');
+ return payload as MangaSeriesDetail;
+}
 function isAppleImageUrl(url:URL) {
   const host=url.hostname.toLowerCase();
   return url.protocol==='https:'&&(host==='mzstatic.com'||host.endsWith('.mzstatic.com'))&&(!url.port||url.port==='443');
@@ -104,6 +120,18 @@ async function appleSearch(q:string,media:string,entity:string,category:Exclude<
 }
 function appleArtworkResults(rows:any[],category:Exclude<Category,'all'>,entity:string):Artwork[] {
  const seen=new Set<string>();
+  const screenshotsById=new Map<string,{url:string;device:string}[]>();
+  if(category==='apps')for(const app of rows){
+    const appId=String(app.trackId||'');if(!appId)continue;
+    const fields:[string,string][] = String(app.kind||'').toLowerCase().includes('mac')||entity.toLowerCase().includes('desktop')
+      ? [['Mac','screenshotUrls']]
+      : [['iPhone','screenshotUrls'],['iPad','ipadScreenshotUrls'],['Apple TV','appletvScreenshotUrls']];
+    const assets=screenshotsById.get(appId)||[];
+    for(const [device,key] of fields)for(const url of Array.isArray(app[key])?app[key]:[]){
+      if(typeof url==='string'&&/^https:\/\//i.test(url)&&!assets.some(asset=>asset.device===device&&asset.url===url))assets.push({url,device});
+    }
+    screenshotsById.set(appId,assets);
+  }
   return rows.flatMap((x:any)=>{
     const raw=String(x.artworkUrl100||x.artworkUrl600||x.artworkUrl512||'');
     const preview=appleArtworkSizedUrl(raw,600)||String(x.artworkUrl600||x.artworkUrl512||raw);
@@ -118,7 +146,9 @@ function appleArtworkResults(rows:any[],category:Exclude<Category,'all'>,entity:
     const source=({music:'Apple Music',musicvideos:'Apple Music',books:'Apple Books',audiobooks:'Apple Books',podcasts:'Apple Podcasts',podcastepisodes:'Apple Podcasts',apps:'App Store',appscreenshots:'App Store',movies:'Apple TV',tv:'Apple TV'} as Partial<Record<Category,string>>)[category]||'Apple';
     const sourceUrl=String(x.collectionViewUrl||x.trackViewUrl||x.artistViewUrl||'');
     const kind=category==='movies'||category==='tv'?'poster':category==='musicvideos'?'thumbnail':'cover';
-    return [{id:`${category}:apple:${id}`,category,title:isMovie?String(x.trackName||x.collectionName||'Untitled film'):title,subtitle,artist:category==='music'?subtitle:undefined,artistUrl:String(x.artistViewUrl||''),year:String(x.releaseDate||'').slice(0,4),source,sourceUrl,previewUrl:preview,imageUrl:image||preview,sdDownloadUrl:preview,downloadUrl:hdDownloadUrls[0],hdDownloadUrls,kind,rights:'source-only'} as Artwork];
+    const screenshots=category==='apps'?screenshotsById.get(id)?.slice(0,4):undefined;
+    const mediaPreviewUrl=category==='musicvideos'&&/^https:\/\//i.test(String(x.previewUrl||''))?String(x.previewUrl):undefined;
+    return [{id:`${category}:apple:${id}`,category,title:isMovie?String(x.trackName||x.collectionName||'Untitled film'):title,subtitle,artist:category==='music'?subtitle:undefined,artistUrl:String(x.artistViewUrl||''),year:String(x.releaseDate||'').slice(0,4),source,sourceUrl,mediaId:category==='apps'?id:undefined,screenshots,mediaPreviewUrl,previewUrl:preview,imageUrl:image||preview,sdDownloadUrl:preview,downloadUrl:hdDownloadUrls[0],hdDownloadUrls,kind,rights:'source-only'} as Artwork];
   });
 }
 function applePodcastEpisodeResults(rows:any[]):Artwork[] {
@@ -147,7 +177,7 @@ function normalizeAppleIsbn(value:string):string|undefined {
   const prefix='978'+isbn.slice(0,9),sum=[...prefix].reduce((total,digit,index)=>total+Number(digit)*(index%2?3:1),0);
   return prefix+String((10-sum%10)%10);
 }
-function appleAppScreenshotResults(rows:any[],limit=24,query=''):Artwork[] {
+function appleAppScreenshotResults(rows:any[],limit=24,query='',deviceFilter?:string):Artwork[] {
   const seen=new Set<string>();
   const candidates:{item:Artwork;exact:number;index:number;device:number;order:number}[]=[];
   const devices:[string,string,number][]=[['iPhone','screenshotUrls',0],['iPad','ipadScreenshotUrls',1],['Apple TV','appletvScreenshotUrls',3]];
@@ -159,7 +189,7 @@ function appleAppScreenshotResults(rows:any[],limit=24,query=''):Artwork[] {
     const sourceUrl=String(app.trackViewUrl||'');
     if(!appId||!sourceUrl)continue;
     const appDevices:[string,string,number][] = String(app.kind||'').toLowerCase().includes('mac')?[['Mac','screenshotUrls',2]]:devices;
-    for(const [device,key,deviceRank] of appDevices){
+    for(const [device,key,deviceRank] of appDevices.filter(([device])=>!deviceFilter||device===deviceFilter)){
       const screenshots=Array.isArray(app[key])?app[key]:[];
       for(const [index,rawValue] of screenshots.entries()){
         const raw=String(rawValue||''),preview=appleArtworkSizedUrl(raw,600),image=appleArtworkSizedUrl(raw,1200);
@@ -364,7 +394,7 @@ function appleChartArtworkItems(category:AppleCategory,country:AppleStorefront,e
     const releaseDate=String(raw['im:releaseDate']?.label||'');
     const hdDownloadUrls=[appleOriginalArtworkUrl(artwork),appleArtworkSizedUrl(artwork,10000),image,preview].filter((candidate,position,all):candidate is string=>Boolean(candidate)&&all.indexOf(candidate)===position);
     const sourceKind=category==='musicvideos'?'thumbnail':category==='movies'||category==='tv'?'poster':'cover';
-    return [{id:`${category}:apple-chart:${country}:${id}`,category,title,subtitle,year:releaseDate.slice(0,4)||undefined,releaseDate,source,provider:source,sourceUrl,previewUrl:preview,imageUrl:image,sdDownloadUrl:preview,downloadUrl:hdDownloadUrls[0],hdDownloadUrls,kind:sourceKind,rights:'source-only'} as Artwork];
+    return [{id:`${category}:apple-chart:${country}:${id}`,category,title,subtitle,year:releaseDate.slice(0,4)||undefined,releaseDate,source,provider:source,sourceUrl,mediaId:category==='apps'?id:undefined,previewUrl:preview,imageUrl:image,sdDownloadUrl:preview,downloadUrl:hdDownloadUrls[0],hdDownloadUrls,kind:sourceKind,rights:'source-only'} as Artwork];
   });
 }
 function appleChartSnapshotKey(country:AppleStorefront,category:AppleCategory,kind:AppleChartKind){return `${country}/${category}/${kind}`;}
@@ -438,6 +468,7 @@ export async function fetchAppleTrendArtworkWithAvailability(
   if(failure)throw failure.reason;
   return {items:[],storefront:preferredStorefront,availableStorefronts:[]};
 }
+
 async function podcasts(q:string,signal?:AbortSignal,country:AppleStorefront='id'):Promise<Artwork[]> {
   if(/^https?:\/\//i.test(q.trim()))return appleCatalogLookup(q.trim(),'podcasts',country,signal);
   return appleSearch(q,'podcast','podcast','podcasts',country,signal);
@@ -472,7 +503,12 @@ export async function searchOfflineArt(query:string,signal?:AbortSignal,category
 function dedupeArtwork(items:Artwork[]):Artwork[]{
  const seen=new Set<string>();
  return items.filter(item=>{
-  const key=`${item.category}:${item.title}|${item.artist||item.subtitle}|${item.year||''}|${item.editionId||item.region||''}|${item.kind||''}`.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+  const externalId=item.externalId?.replace(/^wikidata:/i,'').trim();
+  const entityId=item.mediaId?.trim()||externalId;
+  const edition=item.editionId||item.region||'';
+  const key=entityId
+   ?`${item.category}:entity:${entityId}:${item.kind||''}:${edition}`.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim()
+   :`${item.category}:${item.title}|${item.artist||item.subtitle}|${item.year||''}|${edition}|${item.kind||''}`.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
   if(seen.has(key))return false;seen.add(key);return true;
  });
 }
@@ -482,7 +518,7 @@ async function searchLocalIndex(q:string,category:string,signal?:AbortSignal,onP
   if(category!=='games'&&category!=='anime'){
    // Every other collection: mirrored open-licensed files first, then Wikidata rows that carry a Commons image.
    const [mirrored,indexed]=await Promise.all([searchOfflineArt(q,signal,category as Artwork['category']).catch(()=>[] as Artwork[]),searchTitleArtworks(category,q,signal,24)]);
-   const note=indexed.withoutImage?[indexed.withoutImage+' more title'+(indexed.withoutImage===1?'':'s')+' match in the offline catalog but have no free image. Open Editions to see them.']:[];
+   const note=indexed.withoutImage?[indexed.withoutImage+' additional title record'+(indexed.withoutImage===1?'':'s')+' match the query, but no image preview is available in this category yet.']:[];
    return {results:dedupeArtwork([...mirrored,...indexed.items]),warnings:note,unavailable:[]};
   }
   const results=category==='games'
@@ -514,7 +550,67 @@ async function youtubeThumbnails(q:string,signal?:AbortSignal):Promise<ProviderR
  return {results:[{id:'videos:youtube:'+id,category:'videos',title,subtitle:author,previewUrl:hq,imageUrl:maxres,sdDownloadUrl:hq,downloadUrl:maxres,hdDownloadUrls:[maxres,sd,hq],sourceUrl:'https://www.youtube.com/watch?v='+id,source:'YouTube thumbnails',provider:'YouTube thumbnails',kind:'thumbnail',rights:'source-only'}],warnings:[],unavailable:[]};
 }
 const LOCAL_ONLY_CATEGORIES=new Set<string>(['comics','boardgames','magazines','physicalmedia']);
-const WORKER_BACKED_CATEGORIES=new Set<string>(['games','anime','manga','webtoons']);
+const WORKER_BACKED_CATEGORIES=new Set<string>(['games','webtoons']);
+function publicAnimeMangaItems(data:any,category:'anime'|'manga',provider:'AniList'|'Jikan / MyAnimeList'|'MangaDex'):Artwork[]{
+ const rows=provider==='AniList'?data?.data?.Page?.media:provider==='MangaDex'?data?.data:data?.data;
+ if(!Array.isArray(rows))return [];
+ return rows.flatMap((entry:any)=>{
+  if(provider==='AniList'){
+   const title=String(entry?.title?.userPreferred||entry?.title?.english||entry?.title?.romaji||entry?.title?.native||'').trim();
+   const image=String(entry?.coverImage?.extraLarge||entry?.coverImage?.large||'').trim();
+   const id=String(entry?.id||'');
+   if(!title||!image||!id)return [];
+   const year=Number(entry?.startDate?.year||entry?.seasonYear);
+   return [{id:`${category}:anilist:${id}`,category,title,subtitle:`AniList ${category} catalogue`,year:Number.isInteger(year)&&year>0?String(year):undefined,previewUrl:String(entry?.coverImage?.large||image),imageUrl:image,downloadUrl:image,sourceUrl:String(entry?.siteUrl||`https://anilist.co/${category}/${id}`),source:'AniList',provider:'AniList',mediaId:id,kind:category==='anime'?'poster':'cover',rights:'source-only'} as Artwork];
+  }
+  if(provider==='Jikan / MyAnimeList'){
+   const id=String(entry?.mal_id||''),title=String(entry?.title_english||entry?.title||entry?.title_japanese||'').trim();
+   const preview=String(entry?.images?.jpg?.image_url||entry?.images?.webp?.image_url||'').trim();
+   const image=String(entry?.images?.jpg?.large_image_url||entry?.images?.webp?.large_image_url||preview).trim();
+   if(!id||!title||!preview||!image)return [];
+   const date=String(category==='anime'?entry?.aired?.from:entry?.published?.from||'');
+   const year=date.match(/\b(19|20)\d{2}\b/)?.[0];
+   const type=category==='anime'?'anime':'manga';
+   return [{id:`${category}:jikan:${id}`,category,title,subtitle:String(entry?.type||`${category} artwork`),year,previewUrl:preview,imageUrl:image,downloadUrl:image,sourceUrl:`https://myanimelist.net/${type}/${id}`,source:'Jikan / MyAnimeList',provider:'Jikan / MyAnimeList',mediaId:id,kind:category==='anime'?'poster':'cover',rights:'source-only'} as Artwork];
+  }
+  const id=String(entry?.id||''),attributes=entry?.attributes||{};
+   const title=String(attributes?.title?.en||attributes?.title?.['ja-ro']||attributes?.title?.ja||Object.values(attributes?.title||{})[0]||'').trim();
+  const cover=Array.isArray(entry?.relationships)?entry.relationships.find((item:any)=>item?.type==='cover_art'):undefined;
+  const fileName=String(cover?.attributes?.fileName||'').trim();
+  if(!id||!title||!fileName)return [];
+  const image=`https://uploads.mangadex.org/covers/${encodeURIComponent(id)}/${encodeURIComponent(fileName)}`;
+  const year=Number(attributes?.year);
+  return [{id:`manga:mangadex:${id}`,category:'manga',title,subtitle:'MangaDex · cover art',year:Number.isInteger(year)&&year>0?String(year):undefined,previewUrl:`${image}.256.jpg`,imageUrl:`${image}.512.jpg`,downloadUrl:`${image}.512.jpg`,sourceUrl:`https://mangadex.org/title/${encodeURIComponent(id)}`,source:'MangaDex',provider:'MangaDex',mediaId:id,kind:'cover',rights:'source-only'} as Artwork];
+ });
+}
+async function searchPublicAnimeMangaSource(query:string,category:'anime'|'manga',source:'anilist'|'jikan'|'mangadex',signal?:AbortSignal):Promise<Artwork[]>{
+ if(source==='anilist'){
+  const gql='query ($search:String,$type:MediaType){Page(page:1,perPage:20){media(search:$search,type:$type,isAdult:false){id title{userPreferred english romaji native} coverImage{large extraLarge} format seasonYear startDate{year} siteUrl}}}';
+  const data=await json('https://graphql.anilist.co',signal,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:gql,variables:{search:query,type:category==='anime'?'ANIME':'MANGA'}})});
+  return publicAnimeMangaItems(data,category,'AniList');
+ }
+ if(source==='jikan'){
+  const type=category==='anime'?'anime':'manga',url=new URL(`https://api.jikan.moe/v4/${type}`);
+  url.searchParams.set('q',query);url.searchParams.set('limit','16');url.searchParams.set('sfw','true');
+  return publicAnimeMangaItems(await json(url.toString(),signal),category,'Jikan / MyAnimeList');
+ }
+ if(category!=='manga')return [];
+ const url=new URL('https://api.mangadex.org/manga');
+ url.searchParams.set('title',query);url.searchParams.set('limit','20');url.searchParams.set('includes[]','cover_art');
+ url.searchParams.set('contentRating[]','safe');url.searchParams.set('order[relevance]','desc');
+ return publicAnimeMangaItems(await json(url.toString(),signal),category,'MangaDex');
+}
+async function searchPublicAnimeManga(query:string,category:'anime'|'manga',source:string,signal?:AbortSignal,onPartial?:(result:ProviderResult)=>void):Promise<ProviderResult>{
+ const sources=source==='all'?(category==='anime'?['anilist','jikan']:['mangadex','jikan','anilist']):[source];
+ const partialResults:Artwork[]=[];
+ const attempts=await Promise.allSettled(sources.map(item=>searchPublicAnimeMangaSource(query,category,item as 'anilist'|'jikan'|'mangadex',signal).then(items=>{
+  partialResults.push(...items);onPartial?.({results:dedupeArtwork(partialResults),warnings:[],unavailable:[]});return items;
+ })));
+ if(signal?.aborted)throw signal.reason||new DOMException('Search cancelled.','AbortError');
+ const results=dedupeArtwork(attempts.flatMap(item=>item.status==='fulfilled'?item.value:[]));
+ const warnings=attempts.flatMap((item,index)=>item.status==='rejected'?[`${sources[index]}: ${item.reason instanceof Error?item.reason.message:'source unavailable'}`]:[]);
+ const result={results,warnings,unavailable:results.length?[]:[category]};onPartial?.(result);return result;
+}
 /** Appends offline matches (mirrored files and Commons-image rows) after live results so every collection shows something even when a live source is thin. */
 async function withOfflineMatches(result:ProviderResult,q:string,category:Category,source:string,signal?:AbortSignal):Promise<ProviderResult>{
  if(source!=='all'||!hasTitleIndex(category))return result;
@@ -547,7 +643,7 @@ async function searchArtworkUncached(q:string,category:Category,country:AppleSto
   const localOnly=LOCAL_ONLY_CATEGORIES.has(category),workerBacked=WORKER_BACKED_CATEGORIES.has(category);
   if(source==='local-index'||(source==='all'&&(localOnly||(workerBacked&&!backend)))){
    const local=await searchLocalIndex(q,category,signal,onPartial);
-   const note=!local.results.length&&!local.warnings.length?[category==='games'?'No offline title matched. Try a platform name (PS2, SNES), a serial, or an exact title.':'No offline match. Try the original or English title, or open Editions for titles without a free image.']:[];
+   const note=!local.results.length&&!local.warnings.length?[category==='games'?'No offline title matched. Try a platform name (PS2, SNES), a serial, or an exact title.':'No image-backed offline match. Try the original or English title, or search all connected sources.']:[];
    return {...local,warnings:[...local.warnings,...note]};
   }
  }
@@ -560,6 +656,28 @@ async function searchArtworkUncached(q:string,category:Category,country:AppleSto
  }
  if(category==='videos'&&!backend)return youtubeThumbnails(q,signal);
  if(!APPLE_SEARCH_CATEGORIES.has(category as AppleCategory)){
+  if(category==='anime'||category==='manga'){
+   const runPublicFallback=async()=>{
+    const live=await searchPublicAnimeManga(q,category,source,signal,onPartial);
+    const merged=source==='all'?await withOfflineMatches(live,q,category,source,signal):live;
+    onPartial?.(merged);
+    return merged;
+   };
+   if(!backend)return runPublicFallback();
+   const params=new URLSearchParams({q,category,country,source});
+   try{
+    const worker=normalizeProviderResult(await json(backend+'/api/search?'+params.toString(),signal));
+    if(worker.results.length&&worker.warnings.length===0)return {...worker,results:dedupeArtwork(worker.results)};
+    const fallback=await runPublicFallback();
+    const result={...fallback,results:dedupeArtwork([...worker.results,...fallback.results]),warnings:uniqueStrings([...worker.warnings,...fallback.warnings])};
+    onPartial?.(result);return result;
+   }catch(error){
+    if(signal?.aborted)throw error;
+    const fallback=await runPublicFallback();
+    const result={...fallback,warnings:uniqueStrings([...fallback.warnings,error instanceof Error?`RUPA Worker: ${error.message}`:'RUPA Worker unavailable'])};
+    onPartial?.(result);return result;
+   }
+  }
   if(category==='games'&&import.meta.env?.DEV&&['vitahex','all','retro'].includes(source)){
    try{
     const local=await searchLocalVita(q,signal);
@@ -567,7 +685,7 @@ async function searchArtworkUncached(q:string,category:Category,country:AppleSto
    }catch(error){if(source==='vitahex'||!backend)return {results:[],warnings:[error instanceof Error?error.message:'Local PS Vita mirror is unavailable.'],unavailable:['games']};}
   }
   if(!backend)return {results:[],warnings:['This collection needs the RUPA Worker. The offline art collection is available without it.'],unavailable:[category]};
-  const local=(category==='games'||category==='anime')&&source==='all'?await searchLocalIndex(q,category,signal):null;
+  const local=category==='games'&&source==='all'?await searchLocalIndex(q,category,signal):null;
   const params=new URLSearchParams({q,category,country,source});
   try{
    const data=normalizeProviderResult(await json(backend+'/api/search?'+params.toString(),signal));

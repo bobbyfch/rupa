@@ -1,5 +1,6 @@
 import { onRequestGet as search } from './search.js';
 import { onRequestGet as image } from './image.js';
+import { onRequestGet as mangaDetail } from './manga-detail.js';
 const json=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{'content-type':'application/json','cache-control':'no-store'}});
 const UUID=/^[a-f0-9-]{36}$/i;
 function safeOrigin(request,env){
@@ -80,6 +81,7 @@ export default {
     if(request.method!=='GET')return cors(json({error:'Method not allowed'},405),origin);
     try{
       if(url.pathname==='/api/search')return cors(await search({request,env}),origin);
+      if(url.pathname==='/api/manga-detail')return cors(await mangaDetail({request,env}),origin);
       if(url.pathname==='/api/image')return cors(await image({request}),origin);
       if(url.pathname==='/api/artist-image')return cors(await appleArtistImage(url.searchParams.get('url')||''),origin);
       if(url.pathname==='/health')return cors(json({status:'ok',app:'rupa'}),origin);

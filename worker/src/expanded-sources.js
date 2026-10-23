@@ -198,10 +198,165 @@ export async function mangaDexCovers(query,limit=12,signal,category='manga') {
     if(!entry)return [];
     const row=entry.row,cover=entry.cover.data?.attributes?.fileName;
     if(!cover)return [];
-    const title=Object.values(row.attributes.title||{})[0]||'Untitled manga',base='https://uploads.mangadex.org/covers/'+row.id+'/'+encodeURIComponent(cover);
+    const titles=row.attributes.title||{},title=titles.en||titles['ja-ro']||titles.ja||Object.values(titles)[0]||'Untitled manga',base='https://uploads.mangadex.org/covers/'+row.id+'/'+encodeURIComponent(cover);
     return [{id:category+':mangadex:'+row.id,category,title:string(title),subtitle:(category==='webtoons'?'MangaDex · web comic':'MangaDex · cover art'),year:firstYear(row.attributes.year),previewUrl:base+'.256.jpg',imageUrl:base+'.512.jpg',
       sourceUrl:'https://mangadex.org/title/'+row.id,provider:'MangaDex',source:'MangaDex',kind:'cover',rights:'source-only'}];
   });
+}
+
+const MANGA_DETAIL_CACHE=new Map();
+const MANGA_GALLERY_CACHE=new Map();
+const OPEN_LIBRARY_MANGA_CACHE=new Map();
+const normalizeMangaTitle=value=>string(value,180).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+function mangaTitleVariants(attributes){
+  const titles=[...Object.values(attributes?.title||{}),...(attributes?.altTitles||[]).flatMap(row=>Object.values(row||{}))];
+  return [...new Set(titles.map(normalizeMangaTitle).filter(Boolean))];
+}
+export function mangaTitleMatchScore(attributes,query){
+  const target=normalizeMangaTitle(query);if(!target)return 0;
+  const variants=mangaTitleVariants(attributes);if(variants.includes(target))return 1;
+  const tokens=new Set(target.split(' '));
+  return Math.max(0,...variants.map(value=>{
+    if(target.startsWith(value+' '))return .88;
+    const other=new Set(value.split(' '));
+    return [...tokens].filter(token=>other.has(token)).length/Math.max(tokens.size,other.size);
+  }));
+}
+function mangaCoverImage(mangaId,fileName,size){
+  return `https://uploads.mangadex.org/covers/${encodeURIComponent(mangaId)}/${encodeURIComponent(fileName)}.${size}.jpg`;
+}
+function mangaPictureTitleScore(row,query){
+  const target=normalizeMangaTitle(query);if(!target)return 0;
+  const values=[row?.title,row?.title_english,row?.title_japanese,...(Array.isArray(row?.title_synonyms)?row.title_synonyms:[])].map(normalizeMangaTitle).filter(Boolean);
+  if(values.includes(target))return 1;
+  const queryTokens=new Set(target.split(' '));
+  return Math.max(0,...values.map(value=>{
+    if(target.startsWith(value+' '))return .88;
+    if(value.startsWith(target+' '))return .78;
+    const titleTokens=new Set(value.split(' '));
+    return [...queryTokens].filter(token=>titleTokens.has(token)).length/Math.max(queryTokens.size,titleTokens.size);
+  }));
+}
+function validMalImage(value){
+  try{const image=new URL(value);return image.protocol==='https:'&&(image.hostname==='cdn.myanimelist.net'||image.hostname.endsWith('.cdn.myanimelist.net'))?image.toString():'';}catch{return '';}
+}
+/** Jikan's picture list is a fallback gallery only; it does not identify print volume numbers. */
+export async function jikanMangaSeriesGallery({title='',malId='',signal}={}){
+  const safeTitle=string(title,180),safeMalId=string(malId,12),numericId=/^\d{1,10}$/.test(safeMalId)?safeMalId:'';
+  if(!numericId&&normalizeMangaTitle(safeTitle).length<2)return null;
+  const cacheKey=numericId?'mal:'+numericId:'title:'+normalizeMangaTitle(safeTitle),cached=MANGA_GALLERY_CACHE.get(cacheKey);
+  if(cached&&cached.expiresAt>Date.now())return cached.value;
+  let row;
+  if(numericId){
+    const response=await api(`https://api.jikan.moe/v4/manga/${numericId}`,{},signal,3500);
+    row=response?.data;
+  }else{
+    const params=new URLSearchParams({q:safeTitle,limit:'8',sfw:'true'});
+    const response=await api('https://api.jikan.moe/v4/manga?'+params,{},signal,3500);
+    const candidates=Array.isArray(response?.data)?response.data:[];
+    const best=candidates.map(candidate=>({candidate,score:mangaPictureTitleScore(candidate,safeTitle)})).sort((a,b)=>b.score-a.score)[0];
+    if(!best||best.score<.72)throw new Error('Jikan could not find a matching manga record.');
+    row=best.candidate;
+  }
+  const id=String(row?.mal_id??'').slice(0,12);
+  if(!/^\d{1,10}$/.test(id))throw new Error('Jikan returned an incomplete manga record.');
+  const pictures=await api(`https://api.jikan.moe/v4/manga/${id}/pictures`,{},signal,3500);
+  const seen=new Set(),volumes=(Array.isArray(pictures?.data)?pictures.data:[]).flatMap((picture,index)=>{
+    const image=validMalImage(picture?.webp?.large_image_url||picture?.jpg?.large_image_url||picture?.webp?.image_url||picture?.jpg?.image_url);
+    if(!image||seen.has(image))return [];
+    seen.add(image);const preview=validMalImage(picture?.webp?.image_url||picture?.jpg?.image_url)||image;
+    return [{id:`manga:jikan:${id}:picture:${index+1}`,category:'manga',title:`${string(row?.title_english||row?.title,180)||safeTitle} · Image ${index+1}`,subtitle:`Image ${index+1} · Jikan / MyAnimeList`,source:'Jikan / MyAnimeList',provider:'Jikan / MyAnimeList',sourceUrl:`https://myanimelist.net/manga/${id}`,previewUrl:preview,imageUrl:image,downloadUrl:image,kind:'cover',rights:'source-only',availability:'link-only'}];
+  }).slice(0,120);
+  if(!volumes.length)return null;
+  const released=string(row?.published?.from,32).match(/\b(?:18|19|20)\d{2}\b/)?.[0];
+  const authors=(Array.isArray(row?.authors)?row.authors:[]).map(author=>string(author?.name,120)).filter(Boolean);
+  const result={id:`jikan:${id}`,title:string(row?.title_english||row?.title||safeTitle,180),description:string(row?.synopsis,1800),year:released,status:string(row?.status,32),lastVolume:'',authors:[...new Set(authors)],source:'Jikan / MyAnimeList',sourceUrl:`https://myanimelist.net/manga/${id}`,volumes,galleryLabel:'Related cover artwork',detailNote:'Fallback gallery from Jikan / MyAnimeList. These images are not numbered and are not verified as separate print volumes.'};
+  if(MANGA_GALLERY_CACHE.size>80)for(const [key,value] of MANGA_GALLERY_CACHE)if(value.expiresAt<=Date.now())MANGA_GALLERY_CACHE.delete(key);
+  MANGA_GALLERY_CACHE.set(cacheKey,{expiresAt:Date.now()+10*60*1000,value:result});
+  return result;
+}
+/** Uses Open Library's search records to find explicitly numbered manga cover works.
+ * Cover images are referenced from covers.openlibrary.org; the cover endpoint is never crawled.
+ */
+export async function openLibraryMangaSeriesGallery({title='',signal}={}){
+  const safeTitle=string(title,180),normalizedTitle=normalizeMangaTitle(safeTitle);
+  if(normalizedTitle.length<2)return null;
+  const cached=OPEN_LIBRARY_MANGA_CACHE.get(normalizedTitle);
+  if(cached&&cached.expiresAt>Date.now())return cached.value;
+  const params=new URLSearchParams({q:safeTitle,limit:'100',fields:'title,cover_i,key,first_publish_year'});
+  const data=await api('https://openlibrary.org/search.json?'+params,{headers:{'User-Agent':'RUPAArtworkArchive/1.0 (https://bobbyfch.github.io/rupa/)'}},signal,5000);
+  const volumesByNumber=new Map();
+  for(const row of Array.isArray(data?.docs)?data.docs:[]){
+    const candidateTitle=string(row?.title,220),normalizedCandidate=normalizeMangaTitle(candidateTitle);
+    if(!normalizedCandidate.startsWith(normalizedTitle+' '))continue;
+    const suffix=normalizedCandidate.slice(normalizedTitle.length).trim();
+    const match=suffix.match(/^(?:(?:volume|vol|book)\s*)?(\d{1,4})$/);
+    const coverId=Number(row?.cover_i),workKey=string(row?.key,100);
+    if(!match||!Number.isSafeInteger(coverId)||coverId<1||!/^\/works\/OL\d+W$/.test(workKey))continue;
+    const number=Number(match[1]);
+    if(number<1||volumesByNumber.has(number))continue;
+    const coverBase=`https://covers.openlibrary.org/b/id/${coverId}`;
+    const year=Number(row?.first_publish_year),volumeLabel=`Volume ${number}`;
+    volumesByNumber.set(number,{id:`manga:openlibrary:${workKey.slice('/works/'.length)}`,category:'manga',title:`${safeTitle} · ${volumeLabel}`,subtitle:`${volumeLabel} · Open Library`,year:Number.isInteger(year)&&year>=1800&&year<=2200?String(year):undefined,source:'Open Library',provider:'Open Library',sourceUrl:`https://openlibrary.org${workKey}`,previewUrl:`${coverBase}-M.jpg`,imageUrl:`${coverBase}-L.jpg`,downloadUrl:`${coverBase}-L.jpg`,kind:'cover',rights:'source-only',availability:'link-only'});
+  }
+  const volumes=[...volumesByNumber.entries()].sort(([a],[b])=>a-b).map(([,item])=>item);
+  if(!volumes.length)return null;
+  const result={id:`openlibrary:${normalizedTitle.replaceAll(' ','-')}`,title:safeTitle,description:'',status:'',lastVolume:'',authors:[],source:'Open Library',sourceUrl:`https://openlibrary.org/search?q=${encodeURIComponent(safeTitle)}`,volumes,galleryLabel:'Numbered cover records',volumesNumbered:true,detailNote:'Open Library records include these numbered cover works. Volume coverage and edition numbering can vary by language and edition.'};
+  if(OPEN_LIBRARY_MANGA_CACHE.size>80)for(const [key,value] of OPEN_LIBRARY_MANGA_CACHE)if(value.expiresAt<=Date.now())OPEN_LIBRARY_MANGA_CACHE.delete(key);
+  OPEN_LIBRARY_MANGA_CACHE.set(normalizedTitle,{expiresAt:Date.now()+10*60*1000,value:result});
+  return result;
+}
+/** Fetches only series metadata and cover-art records. It never requests chapters or page images. */
+export async function mangaDexSeriesDetail({id='',title='',signal}={}){
+  const safeId=string(id,80),safeTitle=string(title,180);
+  const uuid=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  if(safeId&&!uuid.test(safeId))throw new Error('Invalid MangaDex series ID.');
+  if(!safeId&&normalizeMangaTitle(safeTitle).length<2)throw new Error('Enter a manga title to load its volumes.');
+  const cacheKey=safeId||normalizeMangaTitle(safeTitle),cached=MANGA_DETAIL_CACHE.get(cacheKey);
+  if(cached&&cached.expiresAt>Date.now())return cached.value;
+  let row;
+  if(safeId){
+    const params=new URLSearchParams({});params.append('includes[]','author');params.append('includes[]','artist');
+    const response=await api(`https://api.mangadex.org/manga/${encodeURIComponent(safeId)}?${params}`,{headers:{'User-Agent':'RUPA Artwork Index/0.4'}},signal,4000);
+    row=response?.data;
+  }else{
+    const params=new URLSearchParams({title:safeTitle,limit:'20','order[relevance]':'desc'});
+    params.append('includes[]','author');params.append('includes[]','artist');params.append('contentRating[]','safe');
+    const response=await api(`https://api.mangadex.org/manga?${params}`,{headers:{'User-Agent':'RUPA Artwork Index/0.4'}},signal,4000);
+    const candidates=Array.isArray(response?.data)?response.data:[];
+    const best=candidates.map(candidate=>({candidate,score:mangaTitleMatchScore(candidate?.attributes,safeTitle)})).sort((a,b)=>b.score-a.score)[0];
+    if(!best||best.score<.75)throw new Error('Matching series was not found on MangaDex.');
+    row=best.candidate;
+  }
+  const mangaId=string(row?.id,80),attributes=row?.attributes||{};
+  if(!uuid.test(mangaId)||!Object.keys(attributes.title||{}).length)throw new Error('MangaDex returned an incomplete series record.');
+  const titles=attributes.title||{},seriesTitle=string(titles.en||titles['ja-ro']||titles.ja||Object.values(titles)[0],180);
+  const coverRows=[];
+  for(let offset=0;offset<300;offset+=100){
+    const params=new URLSearchParams({limit:'100',offset:String(offset),'order[volume]':'asc'});params.append('manga[]',mangaId);
+    const page=await api(`https://api.mangadex.org/cover?${params}`,{headers:{'User-Agent':'RUPA Artwork Index/0.4'}},signal,4000);
+    const rows=Array.isArray(page?.data)?page.data:[];coverRows.push(...rows);
+    if(rows.length<100||coverRows.length>=Number(page?.total||0))break;
+  }
+  const byVolume=new Map();
+  for(const cover of coverRows){
+    const fileName=string(cover?.attributes?.fileName,220),volume=string(cover?.attributes?.volume,40);
+    if(!fileName||!volume)continue;
+    const current=byVolume.get(volume),locale=string(cover?.attributes?.locale,12).toLowerCase();
+    if(!current||locale==='en'||(!current.locale&&locale))byVolume.set(volume,{cover,locale});
+  }
+  const volumeNumber=value=>{const match=value.match(/\d+(?:\.\d+)?/);return match?Number(match[0]):Number.POSITIVE_INFINITY;};
+  const volumes=[...byVolume.entries()].sort(([a],[b])=>volumeNumber(a)-volumeNumber(b)||a.localeCompare(b,undefined,{numeric:true})).map(([volume,{cover,locale}],index)=>{
+    const fileName=string(cover.attributes.fileName,220),id=string(cover.id,80),label=`Volume ${volume}`;
+    return {id:`manga:mangadex:${mangaId}:cover:${id||index}`,category:'manga',title:`${seriesTitle} · ${label}`,subtitle:`${label}${locale?` · ${locale.toUpperCase()}`:''}`,source:'MangaDex',provider:'MangaDex',sourceUrl:`https://mangadex.org/title/${mangaId}`,previewUrl:mangaCoverImage(mangaId,fileName,256),imageUrl:mangaCoverImage(mangaId,fileName,512),downloadUrl:`https://uploads.mangadex.org/covers/${mangaId}/${encodeURIComponent(fileName)}`,mediaId:id||undefined,kind:'cover',rights:'source-only',availability:'link-only'};
+  });
+  const authors=(row.relationships||[]).filter(rel=>rel.type==='author'||rel.type==='artist').map(rel=>string(rel?.attributes?.name,120)).filter(Boolean);
+  const description=attributes.description?.en||attributes.description?.['ja-ro']||Object.values(attributes.description||{}).find(value=>typeof value==='string')||'';
+  const year=Number(attributes.year);
+  const result={id:mangaId,title:seriesTitle,description:string(description,1800),year:Number.isInteger(year)&&year>0?String(year):undefined,status:string(attributes.status,32),lastVolume:string(attributes.lastVolume,32),authors:[...new Set(authors)],source:'MangaDex',sourceUrl:`https://mangadex.org/title/${mangaId}`,volumes};
+  if(MANGA_DETAIL_CACHE.size>80)for(const [key,value] of MANGA_DETAIL_CACHE)if(value.expiresAt<=Date.now())MANGA_DETAIL_CACHE.delete(key);
+  MANGA_DETAIL_CACHE.set(cacheKey,{expiresAt:Date.now()+6*60*1000,value:result});
+  return result;
 }
 
 export async function additionalGames(query,signal) {

@@ -1,6 +1,6 @@
 // Live, measured source health (no keys): registry probes, mirrored-asset license recheck and image-size samples per index shard.
 // Writes data/checks/source-health.json. Run: node scripts/health/check-sources.mjs [--samples 10]
-import { readFile, readdir, writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { request } from '../lib/net.mjs';
 import { imageInfo } from '../lib/imageinfo.mjs';
@@ -58,7 +58,12 @@ await pool(art.assets.filter(asset => !asset.sourceId || asset.sourceId === 'cle
 });
 
 const shards = [];
-for (const file of (await readdir(path.join(ROOT, 'public/offline/index'))).filter(name => /^(games-|anime)/.test(name)).sort()) {
+const indexManifest = await read('public/offline/index/manifest.json');
+const shardFiles = (Array.isArray(indexManifest.shards) ? indexManifest.shards : [])
+  .filter(shard => shard && (shard.kind === 'games' || shard.kind === 'anime') && typeof shard.id === 'string')
+  .map(shard => `${shard.id}.json`)
+  .sort();
+for (const file of shardFiles) {
   const shard = await read(`public/offline/index/${file}`);
   let urls;
   if (shard.kind === 'anime') urls = pick(shard.rows, samples).map(row => `${shard.imageBase}${row[5]}${shard.imageSuffix}`);

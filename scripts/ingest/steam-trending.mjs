@@ -7,7 +7,16 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const OUTPUT = resolve(ROOT, 'public/data/games-trending.json');
 const ARTWORK_OUTPUT = resolve(ROOT, 'public/offline/index/games-steam.json');
 const SEEDS = resolve(ROOT, 'scripts/data/game-artwork-seeds.json');
-const ENDPOINT = 'https://store.steampowered.com/search/results/?query=&start=0&count=25&filter=topsellers&json=1';
+const TOP_SELLERS_ENDPOINT = 'https://store.steampowered.com/search/results/?query=&start=0&count=25&filter=topsellers&json=1';
+const FEATURED_ENDPOINT = 'https://store.steampowered.com/api/featuredcategories/?cc=us&l=en';
+const MOST_PLAYED_ENDPOINT = 'https://api.steampowered.com/ISteamChartsService/GetMostPlayedGames/v1/';
+const CHARTS = {
+  top_sellers: { label: 'Steam / US Top Sellers', sourceUrl: 'https://store.steampowered.com/charts/topselling/' },
+  most_played: { label: 'Steam / Most Played', sourceUrl: 'https://store.steampowered.com/charts/mostplayed?language=english' },
+  new_releases: { label: 'Steam / New Releases', sourceUrl: 'https://store.steampowered.com/explore/new/' },
+  coming_soon: { label: 'Steam / Coming Soon', sourceUrl: 'https://store.steampowered.com/search/?filter=comingsoon' },
+  specials: { label: 'Steam / On Sale', sourceUrl: 'https://store.steampowered.com/search/?specials=1' },
+};
 
 async function readJson(path, fallback) {
   try {
@@ -17,23 +26,67 @@ async function readJson(path, fallback) {
   }
 }
 
+async function optionalJson(fetchImpl, url, logger, label) {
+  try {
+    const response = await fetchImpl(url, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(12_000) });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    logger.warn?.(`${label} could not be refreshed: ${error.message}`);
+    return null;
+  }
+}
+
+function featuredItems(featured, key, source) {
+  const rows = featured?.[key]?.items;
+  if (!Array.isArray(rows)) return [];
+  return rows.flatMap((item, index) => {
+    const appId = Number(item?.id);
+    const title = typeof item?.name === 'string' ? item.name.trim() : '';
+    const image = item?.header_image || item?.large_capsule_image || item?.small_capsule_image;
+    if (!Number.isSafeInteger(appId) || appId <= 0 || !title || typeof image !== 'string' || !/^https:\/\//.test(image)) return [];
+    if (item.type !== undefined && Number(item.type) !== 0) return [];
+    return [{ rank: index + 1, appId, title, image, sourceUrl: `https://store.steampowered.com/app/${appId}/`, source }];
+  });
+}
+
 export async function refreshSteamTrends({ fetchImpl = fetch, outputPath = OUTPUT, artworkPath = ARTWORK_OUTPUT, logger = console } = {}) {
-  const prior = await readJson(outputPath, { items: [] });
+  const prior = await readJson(outputPath, { items: [], charts: {} });
   const priorArtwork = await readJson(artworkPath, { games: [] });
   try {
-    const response = await fetchImpl(ENDPOINT, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(12_000) });
-    if (!response.ok) throw new Error(`Steam store returned HTTP ${response.status}.`);
-    const data = await response.json();
-    const rows = Array.isArray(data?.items) ? data.items : [];
-    const trendingCandidates = rows.flatMap(item => {
+    const [topResponse, featuredData, mostPlayedData] = await Promise.all([
+      fetchImpl(TOP_SELLERS_ENDPOINT, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(12_000) }),
+      optionalJson(fetchImpl, FEATURED_ENDPOINT, logger, 'Steam featured charts'),
+      optionalJson(fetchImpl, MOST_PLAYED_ENDPOINT, logger, 'Steam most-played chart'),
+    ]);
+    if (!topResponse.ok) throw new Error(`Steam store returned HTTP ${topResponse.status}.`);
+    const topData = await topResponse.json();
+    const topRows = Array.isArray(topData?.items) ? topData.items : [];
+    const topCandidates = topRows.flatMap(item => {
       const match = String(item.logo || '').match(/\/apps\/(\d+)\//);
       return match && Number(match[1]) > 0 && typeof item.name === 'string' ? [{ appId: Number(match[1]), title: item.name.trim() }] : [];
     });
+
+    const newest = featuredItems(featuredData, 'new_releases', 'Steam new releases');
+    const comingSoon = featuredItems(featuredData, 'coming_soon', 'Steam coming soon');
+    const specials = featuredItems(featuredData, 'specials', 'Steam specials');
+    const mostPlayedRanks = Array.isArray(mostPlayedData?.response?.ranks) ? mostPlayedData.response.ranks : [];
+    const mostPlayedCandidates = mostPlayedRanks.slice(0, 20).flatMap(row => {
+      const appId = Number(row?.appid);
+      return Number.isSafeInteger(appId) && appId > 0 ? [{ appId, title: '' }] : [];
+    });
     const seeds = await readJson(SEEDS, []);
-    const candidates = [...new Map([...trendingCandidates, ...(Array.isArray(seeds) ? seeds : [])].map(candidate => [candidate.appId, candidate])).values()];
-    const verified = [];
+    const indexCandidates = [
+      ...topCandidates,
+      ...mostPlayedCandidates,
+      ...newest.slice(0, 12),
+      ...(Array.isArray(seeds) ? seeds : []),
+    ];
+    const candidates = [...new Map(indexCandidates.map(candidate => [candidate.appId, candidate])).values()];
+    const indexedById = new Map();
     const indexedGames = [];
     let next = 0;
+
     async function worker() {
       while (next < candidates.length) {
         const candidate = candidates[next++];
@@ -60,27 +113,44 @@ export async function refreshSteamTrends({ fetchImpl = fetch, outputPath = OUTPU
               logger.warn?.(`Press Center refresh failed for ${candidate.title}; preserving ${publisherAssets.length} saved images: ${error.message}`);
             }
           }
-          const assets = [...steamAssets, ...publisherAssets];
-          const platforms = ['pc'];
-          const row = { appId: candidate.appId, title: game.name, image: game.header_image, sourceUrl, platforms, assets };
+          const row = { appId: candidate.appId, title: game.name, image: game.header_image, sourceUrl, platforms: ['pc'], assets: [...steamAssets, ...publisherAssets] };
           indexedGames.push(row);
-          if (trendingCandidates.some(item => item.appId === candidate.appId)) verified.push({ appId: candidate.appId, title: game.name, image: game.header_image, sourceUrl, source: 'Steam top sellers' });
+          indexedById.set(candidate.appId, row);
         } catch {}
       }
     }
+
     await Promise.all(Array.from({ length: Math.min(5, candidates.length) }, worker));
-    const rankById = new Map(candidates.map((candidate, index) => [candidate.appId, index + 1]));
-    const items = verified.sort((a, b) => (rankById.get(a.appId) || 0) - (rankById.get(b.appId) || 0)).slice(0, 20)
-      .map((item, index) => ({ rank: index + 1, ...item }));
-    if (!items.length) throw new Error('Steam top sellers response contained no game artwork.');
+    const topSellers = topCandidates.flatMap(candidate => {
+      const game = indexedById.get(candidate.appId);
+      return game ? [{ appId: game.appId, title: game.title, image: game.image, sourceUrl: game.sourceUrl, source: 'Steam top sellers' }] : [];
+    }).slice(0, 20).map((item, index) => ({ rank: index + 1, ...item }));
+    if (!topSellers.length) throw new Error('Steam top sellers response contained no game artwork.');
+
+    const charts = { ...(prior.charts || {}) };
+    charts.top_sellers = { ...CHARTS.top_sellers, items: topSellers };
+    const played = mostPlayedCandidates.flatMap(candidate => {
+      const game = indexedById.get(candidate.appId);
+      return game ? [{ appId: game.appId, title: game.title, image: game.image, sourceUrl: game.sourceUrl, source: 'Steam most played' }] : [];
+    }).map((item, index) => ({ rank: index + 1, ...item }));
+    if (played.length) charts.most_played = { ...CHARTS.most_played, items: played };
+    else if (charts.most_played?.items?.length) logger.warn?.('Steam most-played chart is empty; preserving its prior snapshot.');
+
+    for (const [id, items] of [['new_releases', newest], ['coming_soon', comingSoon], ['specials', specials]]) {
+      if (items.length) charts[id] = { ...CHARTS[id], items: items.slice(0, 20) };
+      else if (charts[id]?.items?.length) logger.warn?.(`Steam ${id} chart is empty; preserving its prior snapshot.`);
+    }
+
     const snapshot = {
-      generatedAt: JSON.stringify(prior.items) === JSON.stringify(items) ? prior.generatedAt || new Date().toISOString() : new Date().toISOString(),
-      source: ENDPOINT,
-      sourceUrl: 'https://store.steampowered.com/charts/topselling/',
-      items,
+      generatedAt: new Date().toISOString(),
+      source: TOP_SELLERS_ENDPOINT,
+      sourceUrl: CHARTS.top_sellers.sourceUrl,
+      items: topSellers,
+      charts,
     };
     await mkdir(dirname(outputPath), { recursive: true });
     await writeFile(outputPath, `${JSON.stringify(snapshot)}\n`);
+
     const mergedGames = new Map(indexedGames.map(game => [game.appId, game]));
     for (const game of priorArtwork.games || []) if (!mergedGames.has(game.appId)) mergedGames.set(game.appId, game);
     const orderedGames = [...mergedGames.values()].sort((a, b) => a.title.localeCompare(b.title));
@@ -94,12 +164,12 @@ export async function refreshSteamTrends({ fetchImpl = fetch, outputPath = OUTPU
     };
     await mkdir(dirname(artworkPath), { recursive: true });
     await writeFile(artworkPath, `${JSON.stringify(artworkSnapshot)}\n`);
-    logger.info?.(`Steam top-seller artwork refreshed: ${items.length} games.`);
+    logger.info?.(`Steam charts refreshed: ${Object.entries(charts).map(([id, chart]) => `${id} ${chart.items.length}`).join(', ')}.`);
     logger.info?.(`Steam artwork index refreshed: ${artworkSnapshot.games.length} titles, image URLs only.`);
     return { ...snapshot, artworkSnapshot };
   } catch (error) {
     if (Array.isArray(prior.items) && prior.items.length) {
-      logger.warn?.(`Steam trend refresh failed; preserving ${prior.items.length} saved games and ${priorArtwork.games?.length || 0} artwork records: ${error.message}`);
+      logger.warn?.(`Steam chart refresh failed; preserving ${prior.items.length} saved top sellers and ${priorArtwork.games?.length || 0} artwork records: ${error.message}`);
       return { ...prior, changed: false };
     }
     throw error;

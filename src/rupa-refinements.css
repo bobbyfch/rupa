@@ -81,27 +81,6 @@
 .shinkai-collection-note{max-width:700px;margin:15px 2px 0;color:var(--muted);font-size:10px;line-height:1.7}
 .shinkai-rights{margin-top:18px;font-size:10px;line-height:1.7}
 .shinkai-rights a{color:var(--accent)}
-.inspection-canvas-video{min-height:0!important;display:block;width:100%;height:auto;aspect-ratio:16/9;overflow:hidden;border-radius:14px;background:#080a10}
-.apple-video-embed{display:block;width:100%;height:100%;min-height:300px;aspect-ratio:16/9;border:0;background:#080a10}
-.music-video-stills{margin:17px 0 0;padding:15px;border:1px solid var(--border);border-radius:17px;background:color-mix(in srgb,var(--soft) 56%,var(--canvas))}
-.music-video-stills-heading{display:flex;justify-content:space-between;align-items:end;gap:12px}
-.music-video-stills-heading h3{margin:5px 0 0;font-size:20px;letter-spacing:-.05em}
-.music-video-stills-heading>span{color:var(--muted);font:500 9px 'IBM Plex Mono',monospace}
-.music-video-stills>p{max-width:760px;margin:8px 0 12px;color:var(--muted);font-size:10px;line-height:1.6}
-.music-video-file{position:relative;display:flex;align-items:center;gap:7px;width:max-content;max-width:100%;min-height:37px;padding:0 11px;border:1px solid var(--border);border-radius:999px;background:var(--canvas);color:var(--ink);font-size:10px;cursor:pointer}
-.music-video-file input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
-.music-video-capture{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;margin-top:12px}
-.music-video-capture video{width:100%;max-height:300px;aspect-ratio:16/9;border-radius:12px;background:#080a10}
-.music-video-capture button{min-height:40px;display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:0 12px;border:1px solid var(--accent);border-radius:999px;background:var(--accent);color:#fff;font-size:10px;font-weight:600;cursor:pointer}
-.music-video-capture button:disabled{opacity:.55;cursor:wait}
-.music-video-still-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:8px;margin-top:12px}
-.music-video-still-card{overflow:hidden;border:1px solid var(--border);border-radius:10px;background:var(--canvas)}
-.music-video-still-card img{width:100%;aspect-ratio:16/10;object-fit:cover}
-.music-video-still-card>div{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:6px}
-.music-video-still-card>div>span{color:var(--muted);font:8px 'IBM Plex Mono',monospace}
-.music-video-still-card a,.music-video-still-card button{display:inline-flex;align-items:center;gap:3px;border:0;background:transparent;color:var(--muted);font-size:8px;text-decoration:none;cursor:pointer}
-.music-video-still-card a:hover,.music-video-still-card button:hover{color:var(--accent)}
-.music-video-stills-empty{display:flex;align-items:center;gap:7px;min-height:52px;margin-top:11px;padding:11px;border:1px dashed var(--border);border-radius:11px;color:var(--muted);font-size:10px}
 .download-export-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;align-items:end;gap:8px}
 .download-export-controls>label{display:grid;gap:5px;min-width:0;color:var(--muted);font-size:9px}
 .download-export-controls select{width:100%;min-width:0;height:38px;padding:0 9px;border:1px solid var(--border);border-radius:10px;background:var(--canvas);color:var(--ink);font:inherit}
@@ -119,7 +98,6 @@
 .art-select{position:absolute;z-index:5;top:9px;left:9px;display:flex;align-items:center;gap:5px;padding:6px 8px;border:1px solid #ffffff79;border-radius:999px;background:#121722c9;color:#fff;font-size:9px;backdrop-filter:blur(12px);cursor:pointer}
 .art-select input{width:13px;height:13px;margin:0;accent-color:var(--accent)}
 @media(max-width:700px){.shinkai-header{align-items:flex-start;flex-direction:column;padding:22px 0 25px}.shinkai-header>a{align-self:flex-start}.shinkai-film-panel{min-height:430px;grid-template-columns:1fr;align-content:end;gap:24px;padding:25px 21px}.shinkai-film-sky{inset:0 0 28% 0;clip-path:none;opacity:.96}.shinkai-film-sky:before{bottom:-42%}.shinkai-film-copy{padding-top:155px}.shinkai-film-copy h2{font-size:clamp(39px,12vw,58px)}.shinkai-film-actions{margin-top:17px}}
-@media(max-width:700px){.music-video-capture{grid-template-columns:1fr}.music-video-capture button{justify-self:start}.music-video-stills{padding:11px}.apple-video-embed{min-height:210px}}
 @media(max-width:540px){.download-export-controls{grid-template-columns:1fr 1fr}.download-export-controls>.ca-button{grid-column:1/-1;min-height:42px}}
 @media(max-width:540px){.archive-batch-toolbar{gap:6px}.archive-batch-toolbar>label{margin-left:0}.archive-batch-toolbar>.ca-button{flex:1}.archive-batch-toolbar>small{flex-basis:100%}}
 @media(max-width:760px){.curated-collection-grid{grid-template-columns:1fr}.curated-collection-grid .ghibli-collection-card,.shinkai-collection-card{grid-template-columns:1fr}.curated-collection-grid .ghibli-collection-image,.shinkai-card-art{min-height:220px}.curated-collection-grid .ghibli-collection-copy,.shinkai-collection-card .ghibli-collection-copy{min-height:220px}}

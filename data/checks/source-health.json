@@ -1,6 +1,6 @@
 {
  "schemaVersion": 1,
- "checkedAt": "2026-10-22T09:26:24.750Z",
+ "checkedAt": "2026-10-23T14:11:19.995Z",
  "sampleSizePerShard": 10,
  "note": "Measured from the ingest machine. Ranged GET of the first 96 KiB; dimensions come from the file header. 403/429 are reported, never bypassed.",
  "probes": [
@@ -10,7 +10,7 @@
    "status": 200,
    "ok": true,
    "contentType": "application/json",
-   "ms": 1100
+   "ms": 422
   },
   {
    "id": "met",
@@ -18,7 +18,15 @@
    "status": 200,
    "ok": true,
    "contentType": "application/json",
-   "ms": 487
+   "ms": 837
+  },
+  {
+   "id": "wellcome",
+   "url": "https://api.wellcomecollection.org/catalogue/v2/images?query=poster&locations.license=cc-0,pdm&pageSize=1",
+   "status": 200,
+   "ok": true,
+   "contentType": "application/json",
+   "ms": 1729
   },
   {
    "id": "aic",
@@ -26,7 +34,7 @@
    "status": 403,
    "ok": false,
    "contentType": "text/html",
-   "ms": 230
+   "ms": 204
   },
   {
    "id": "commons",
@@ -34,7 +42,7 @@
    "status": 200,
    "ok": true,
    "contentType": "application/json",
-   "ms": 627
+   "ms": 660
   },
   {
    "id": "openverse",
@@ -42,7 +50,7 @@
    "status": 200,
    "ok": true,
    "contentType": "application/json",
-   "ms": 215
+   "ms": 112
   },
   {
    "id": "loc",
@@ -50,7 +58,31 @@
    "status": 403,
    "ok": false,
    "contentType": "text/html",
-   "ms": 143
+   "ms": 76
+  },
+  {
+   "id": "smithsonian",
+   "url": "https://smithsonian-open-access.s3-us-west-2.amazonaws.com/metadata/edan/chndm/index.txt",
+   "status": 200,
+   "ok": true,
+   "contentType": "text/plain",
+   "ms": 794
+  },
+  {
+   "id": "nasa-posters",
+   "url": "https://images-api.nasa.gov/search?q=poster&media_type=image&page_size=1",
+   "status": 200,
+   "ok": true,
+   "contentType": "application/json",
+   "ms": 1658
+  },
+  {
+   "id": "mia",
+   "url": "https://search.artsmia.org/poster?size=1",
+   "status": 200,
+   "ok": true,
+   "contentType": "application/json",
+   "ms": 852
   },
   {
    "id": "libretro-thumbnails",
@@ -58,7 +90,7 @@
    "status": 200,
    "ok": true,
    "contentType": "image/png",
-   "ms": 625
+   "ms": 771
   },
   {
    "id": "vitahex",
@@ -66,7 +98,7 @@
    "status": 200,
    "ok": true,
    "contentType": "text/plain",
-   "ms": 87
+   "ms": 71
   },
   {
    "id": "wikidata",
@@ -74,7 +106,7 @@
    "status": 200,
    "ok": true,
    "contentType": "application/sparql-results+json",
-   "ms": 298
+   "ms": 394
   },
   {
    "id": "librivox",
@@ -82,7 +114,7 @@
    "status": 200,
    "ok": true,
    "contentType": "application/json",
-   "ms": 785
+   "ms": 662
   },
   {
    "id": "apple",
@@ -90,7 +122,7 @@
    "status": 200,
    "ok": true,
    "contentType": "text/javascript",
-   "ms": 75
+   "ms": 99
   },
   {
    "id": "deezer",
@@ -98,7 +130,7 @@
    "status": 200,
    "ok": true,
    "contentType": "application/json",
-   "ms": 386
+   "ms": 293
   },
   {
    "id": "musicbrainz-caa",
@@ -106,7 +138,7 @@
    "status": 200,
    "ok": true,
    "contentType": "application/json",
-   "ms": 633
+   "ms": 631
   },
   {
    "id": "mangadex",
@@ -114,7 +146,7 @@
    "status": 0,
    "ok": false,
    "error": "fetch failed",
-   "ms": 22333
+   "ms": 1617
   },
   {
    "id": "jikan",
@@ -122,7 +154,7 @@
    "status": 0,
    "ok": false,
    "error": "fetch failed",
-   "ms": 22352
+   "ms": 22309
   },
   {
    "id": "openlibrary",
@@ -130,17 +162,10 @@
    "status": 200,
    "ok": true,
    "contentType": "application/json",
-   "ms": 1057
+   "ms": 9919
   }
  ],
  "mirroredAssetRecheck": [
-  {
-   "id": "art:cleveland:143846",
-   "license": "CC0",
-   "printWidth": 2529,
-   "printHeight": 3400,
-   "matchesManifest": true
-  },
   {
    "id": "art:cleveland:129201",
    "license": "CC0",
@@ -149,9 +174,9 @@
    "matchesManifest": true
   },
   {
-   "id": "art:cleveland:127812",
+   "id": "art:cleveland:153129",
    "license": "CC0",
-   "printWidth": 1853,
+   "printWidth": 2396,
    "printHeight": 3400,
    "matchesManifest": true
   },
@@ -163,9 +188,16 @@
    "matchesManifest": true
   },
   {
-   "id": "art:cleveland:153129",
+   "id": "art:cleveland:143846",
    "license": "CC0",
-   "printWidth": 2396,
+   "printWidth": 2529,
+   "printHeight": 3400,
+   "matchesManifest": true
+  },
+  {
+   "id": "art:cleveland:127812",
+   "license": "CC0",
+   "printWidth": 1853,
    "printHeight": 3400,
    "matchesManifest": true
   },
@@ -469,7 +501,7 @@
   {
    "shard": "games-psvita.json",
    "platform": "psvita",
-   "indexedRows": 100,
+   "indexedRows": 101,
    "sampled": 10,
    "ok": 10,
    "failed": 0,
@@ -477,7 +509,7 @@
    "medianLongEdgePx": 320,
    "minLongEdgePx": 320,
    "maxLongEdgePx": 320,
-   "medianBytes": 46241,
+   "medianBytes": 48119,
    "shareAtOrAbove1600px": 0
   },
   {

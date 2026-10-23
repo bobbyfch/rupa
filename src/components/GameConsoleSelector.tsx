@@ -22,7 +22,7 @@ function platformMark(id: string, family: string) {
   if (family === 'Nintendo') return 'N';
   if (id === 'pc') return 'PC';
   if (family === 'Sega') return 'SG';
-  return '◆';
+  return <Gamepad2 size={15}/>;
 }
 
 function platformLogo(id: string, family: string) {
@@ -32,6 +32,15 @@ function platformLogo(id: string, family: string) {
   return logo ? `https://cdn.simpleicons.org/${logo[0]}/${logo[1]}` : '';
 }
 
+function PlatformMark({ id, family }: { id: string; family: string }) {
+  const logo = platformLogo(id, family);
+  const [logoState, setLogoState] = useState<'loading' | 'ready' | 'failed'>('loading');
+  return <span className="console-platform-mark" data-family={family} aria-hidden="true">
+    {logo && logoState !== 'failed' && <img src={logo} alt="" loading="lazy" className={logoState === 'ready' ? 'is-ready' : ''} onLoad={() => setLogoState('ready')} onError={() => setLogoState('failed')}/>}
+    {logoState !== 'ready' && <span className="console-platform-fallback">{platformMark(id, family)}</span>}
+  </span>;
+}
+
 export function GameConsoleSelector({ options, value, onChange }: { options: ConsoleOption[]; value: string; onChange: (id: string) => void }) {
   const [family, setFamily] = useState('All families');
   const families = useMemo(() => ['All families', ...Array.from(new Set(options.map(option => INFO[option.id]?.family || 'Other')))], [options]);
@@ -39,11 +48,10 @@ export function GameConsoleSelector({ options, value, onChange }: { options: Con
   return <div className="console-selector">
     <div className="console-family-tabs" role="group" aria-label="Console family">{families.map(name => <button type="button" key={name} className={family === name ? 'active' : ''} aria-pressed={family === name} onClick={() => setFamily(name)}>{name}</button>)}</div>
     <div className="console-rail" role="group" aria-label="Choose a console">
-      <button type="button" className={'console-option console-select console-option-all' + (value === 'all' ? ' active' : '')} aria-pressed={value === 'all'} onClick={() => onChange('all')}><span className="console-platform-mark" data-family="All">{platformMark('all','All')}</span><span className="console-option-copy"><strong>All systems</strong><small>Every indexed console</small></span></button>
+      <button type="button" className={'console-option console-select console-option-all' + (value === 'all' ? ' active' : '')} aria-pressed={value === 'all'} onClick={() => onChange('all')}><PlatformMark id="all" family="All"/><span className="console-option-copy"><strong>All systems</strong><small>Every indexed console</small></span></button>
       {visible.map(option => {
         const info = INFO[option.id] || { family: 'Other', era: 'catalogued system' };
-        const logo = platformLogo(option.id, info.family);
-        return <button type="button" key={option.id} className={'console-option console-select' + (value === option.id ? ' active' : '')} aria-pressed={value === option.id} onClick={() => onChange(option.id)}><span className="console-platform-mark" data-family={info.family}>{logo&&<img src={logo} alt="" loading="lazy" onError={event=>{event.currentTarget.style.display='none';}}/>}<span>{platformMark(option.id,info.family)}</span></span><span className="console-option-copy"><strong>{option.label}</strong><small>{info.family} · {info.era}</small></span></button>;
+        return <button type="button" key={option.id} className={'console-option console-select' + (value === option.id ? ' active' : '')} aria-pressed={value === option.id} onClick={() => onChange(option.id)}><PlatformMark id={option.id} family={info.family}/><span className="console-option-copy"><strong>{option.label}</strong><small>{info.family} · {info.era}</small></span></button>;
       })}
     </div>
   </div>;
