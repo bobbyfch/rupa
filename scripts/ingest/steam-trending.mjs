@@ -86,6 +86,7 @@ export async function refreshSteamTrends({ fetchImpl = fetch, outputPath = OUTPU
     const orderedGames = [...mergedGames.values()].sort((a, b) => a.title.localeCompare(b.title));
     const artworkSnapshot = {
       schemaVersion: 1,
+      rights: 'reference-only',
       generatedAt: JSON.stringify(priorArtwork.games) === JSON.stringify(orderedGames) ? priorArtwork.generatedAt || snapshot.generatedAt : snapshot.generatedAt,
       source: 'Steam Store and configured publisher press pages; image URLs remain hosted by their original providers.',
       sourceUrl: 'https://store.steampowered.com/api/appdetails?appids={appId}&cc=us&l=en',
