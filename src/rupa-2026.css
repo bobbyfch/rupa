@@ -89,12 +89,8 @@ button, input, select { font: inherit; }
 .lane-2 { top: 37%; left: -20%; transform: rotate(3deg); animation: rupa-art-drift-b 66s linear infinite; }
 .lane-3 { top: 69%; left: -7%; transform: rotate(-2deg); animation: rupa-art-drift-a 72s linear infinite; }
 .art-strip-track { flex: none; display: flex; align-items: center; gap: 13px; width: max-content; }
-.art-strip-card { position: relative; flex: none; display: block; width: clamp(104px, 12.5vw, 174px); height: clamp(126px, 16vw, 216px); overflow: hidden; border: 1px solid #ffffff80; background: var(--tile); box-shadow: 0 15px 34px -24px #0009; pointer-events: auto; transform: rotate(var(--tilt, 0deg)); }
-.art-strip-card:nth-child(4n + 1) { width: clamp(100px, 10vw, 148px); height: clamp(150px, 20vw, 265px); --tilt: -2deg; }
-.art-strip-card:nth-child(4n + 2) { width: clamp(132px, 15vw, 208px); height: clamp(104px, 12vw, 158px); --tilt: 1.5deg; }
-.art-strip-card:nth-child(4n + 3) { width: clamp(105px, 12vw, 166px); height: clamp(132px, 15vw, 202px); --tilt: 2deg; }
-.art-strip-card:nth-child(4n + 4) { width: clamp(145px, 16vw, 224px); height: clamp(108px, 12vw, 158px); --tilt: -1deg; }
-.art-strip-card img { width: 100%; height: 100%; display: block; object-fit: cover; transition: transform .6s cubic-bezier(.2,.7,.3,1), filter .3s; }
+.art-strip-card { position: relative; flex: none; display: block; width: clamp(118px, 12vw, 164px); height: clamp(150px, 15vw, 205px); overflow: hidden; border: 1px solid #ffffff80; background: var(--tile); box-shadow: 0 15px 34px -24px #0009; pointer-events: auto; transform: rotate(var(--tilt, 0deg)); }
+.art-strip-card img { width: 100%; height: 100%; display: block; object-fit: cover; object-position: center; transition: transform .6s cubic-bezier(.2,.7,.3,1), filter .3s; }
 .art-strip-card:hover img { transform: scale(1.06); }
 .art-strip-caption { position: absolute; inset: auto 0 0; display: flex; flex-direction: column; gap: 3px; padding: 25px 9px 8px; color: white; background: linear-gradient(transparent, #000b); opacity: 0; transition: opacity .2s; }
 .art-strip-card:hover .art-strip-caption, .art-strip-card:focus-visible .art-strip-caption { opacity: 1; }
@@ -104,7 +100,7 @@ button, input, select { font: inherit; }
 .moving-artwork-strip.is-loading { display: block; }
 .strip-loading-message { position: absolute; z-index: 3; right: 4%; bottom: 7%; display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 10px; }
 .moving-artwork-strip.is-loading .art-strip-lane { gap: 13px; }
-.moving-artwork-strip.is-loading .art-strip-lane > span { width: clamp(104px, 12.5vw, 174px); height: clamp(126px, 16vw, 216px); border: 1px solid var(--border); background: linear-gradient(105deg, var(--soft) 24%, var(--canvas) 43%, var(--soft) 62%); background-size: 240% 100%; animation: rupa-skeleton 1.7s ease-in-out infinite; }
+.moving-artwork-strip.is-loading .art-strip-lane > span { width: clamp(118px, 12vw, 164px); height: clamp(150px, 15vw, 205px); border: 1px solid var(--border); background: linear-gradient(105deg, var(--soft) 24%, var(--canvas) 43%, var(--soft) 62%); background-size: 240% 100%; animation: rupa-skeleton 1.7s ease-in-out infinite; }
 .moving-artwork-strip.is-unavailable { width: min(55%, 680px); min-height: 84px; right: 0; top: auto; bottom: 18%; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border: 1px solid var(--border); background: var(--glass); color: var(--muted); font-size: 11px; pointer-events: auto; }
 .moving-artwork-strip.is-unavailable button { display: inline-flex; align-items: center; gap: 6px; color: var(--ink); background: transparent; border: 0; cursor: pointer; }
 @keyframes rupa-art-drift-a { from { transform: translateX(0) rotate(-4deg); } to { transform: translateX(-50%) rotate(-4deg); } }
@@ -248,10 +244,6 @@ button, input, select { font: inherit; }
   .art-strip-lane { gap: 8px; }
   .art-strip-track { gap: 8px; }
   .art-strip-card, .moving-artwork-strip.is-loading .art-strip-lane > span { width: 96px; height: 124px; }
-  .art-strip-card:nth-child(4n + 1) { width: 85px; height: 136px; }
-  .art-strip-card:nth-child(4n + 2) { width: 112px; height: 90px; }
-  .art-strip-card:nth-child(4n + 3) { width: 96px; height: 120px; }
-  .art-strip-card:nth-child(4n + 4) { width: 118px; height: 91px; }
   .art-strip-heading { top: 6px; bottom: auto; right: 4px; }
   .art-strip-heading .tiny-kicker { display: none; }
   .strip-loading-message { right: 4px; }

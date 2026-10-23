@@ -737,7 +737,7 @@ html, body, #root, .app-root {
 .ghibli-poster-heading,.ghibli-gallery-heading { margin-bottom: 15px; }
 .ghibli-poster-archive>p { margin-bottom: 18px; }
 .ghibli-poster-grid,.ghibli-still-grid { column-gap: clamp(13px,1.6vw,22px); }
-.ghibli-poster-card,.ghibli-still-card,.shinkai-gallery-card,.shinkai-exhibition-card,.game-cover-card,.game-title-group,.game-detail-asset,.category-card,.apple-trend-card {
+.ghibli-poster-card,.ghibli-still-card,.shinkai-gallery-card,.shinkai-exhibition-card,.game-cover-card,.game-title-group,.game-detail-asset,.apple-trend-card {
   border: 1px solid var(--glass-line);
   border-radius: var(--liquid-radius);
   background: var(--liquid-surface);
