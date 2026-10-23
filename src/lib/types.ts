@@ -19,6 +19,7 @@ export interface Artwork {
   /** Apple-hosted, short-lived preview for a music video. Never persisted as an asset. */
   mediaPreviewUrl?: string;
   mediaId?: string; externalId?: string; kind?: ArtKind; language?: string | null; artist?: string; artistUrl?: string; provider?: string;
+  alternateTitles?: string[];
   releaseDate?: string;
   licenseUrl?: string; licenseLabel?: string; attribution?: string; originalWidth?: number; originalHeight?: number;
   rights?: 'unverified' | 'source-only' | 'open-license';

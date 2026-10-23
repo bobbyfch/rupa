@@ -301,7 +301,7 @@ export async function openLibraryMangaSeriesGallery({title='',signal}={}){
   }
   const volumes=[...volumesByNumber.entries()].sort(([a],[b])=>a-b).map(([,item])=>item);
   if(!volumes.length)return null;
-  const result={id:`openlibrary:${normalizedTitle.replaceAll(' ','-')}`,title:safeTitle,description:'',status:'',lastVolume:'',authors:[],source:'Open Library',sourceUrl:`https://openlibrary.org/search?q=${encodeURIComponent(safeTitle)}`,volumes,galleryLabel:'Numbered cover records',volumesNumbered:true,detailNote:'Open Library records include these numbered cover works. Volume coverage and edition numbering can vary by language and edition.'};
+  const result={id:`openlibrary:${normalizedTitle.replaceAll(' ','-')}`,title:safeTitle,description:'',status:'',lastVolume:'',authors:[],source:'Open Library',sourceUrl:`https://openlibrary.org/search?q=${encodeURIComponent(safeTitle)}`,volumes,galleryLabel:'Volume covers',volumesNumbered:true,detailNote:'Open Library records include these numbered cover works. Volume coverage and edition numbering can vary by language and edition.'};
   if(OPEN_LIBRARY_MANGA_CACHE.size>80)for(const [key,value] of OPEN_LIBRARY_MANGA_CACHE)if(value.expiresAt<=Date.now())OPEN_LIBRARY_MANGA_CACHE.delete(key);
   OPEN_LIBRARY_MANGA_CACHE.set(normalizedTitle,{expiresAt:Date.now()+10*60*1000,value:result});
   return result;

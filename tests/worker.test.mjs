@@ -103,7 +103,7 @@ test('Open Library provides numbered manga cover records when MangaDex is unavai
   try{
     const response=await mangaDetail({request:request('https://x.test/api/manga-detail?title=Rupa%20Manga%20Fixture')});
     const body=await response.json();
-    assert.equal(response.status,200);assert.equal(body.source,'Open Library');assert.equal(body.galleryLabel,'Numbered cover records');assert.equal(body.volumesNumbered,true);
+    assert.equal(response.status,200);assert.equal(body.source,'Open Library');assert.equal(body.galleryLabel,'Volume covers');assert.equal(body.volumesNumbered,true);
     assert.deepEqual(body.volumes.map(item=>item.subtitle.split(' · ')[0]),['Volume 1','Volume 2']);
     assert.equal(body.volumes[0].previewUrl,'https://covers.openlibrary.org/b/id/1020563-M.jpg');
     assert.equal(body.volumes[1].imageUrl,'https://covers.openlibrary.org/b/id/9609527-L.jpg');

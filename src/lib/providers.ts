@@ -2,26 +2,71 @@ import type { AppleCategory, AppleStorefront, Artwork, Category, MangaSeriesDeta
 import { APPLE_STOREFRONTS } from './appleStorefronts.ts';
 import appleChartFeeds from './appleChartFeeds.json' with { type: 'json' };
 import { artworkMatches, hasTitleIndex, searchAnimeIndex, searchGameIndex, searchTitleArtworks } from './catalog.ts';
+import { fetchOpenLibraryMangaSeries, mergeMangaSeriesDetails } from './mangaCatalog.ts';
 const backend = (import.meta.env?.VITE_API_URL || '').replace(/\/$/, '');
 const API_REQUEST_TIMEOUT_MS=15_000;
 const MANGA_DETAIL_REQUEST_TIMEOUT_MS=28_000;
 const APPLE_SEARCH_TIMEOUT_MS=10_000;
 export const hasBackend = Boolean(backend);
 export const apiUrl = (path:string) => `${backend}${path}`;
-export async function getMangaSeriesDetail(title:string,id:string|undefined,signal:AbortSignal,provider?:string,mediaId?:string):Promise<MangaSeriesDetail>{
+async function aniListMangaAliases(mediaId:string,signal:AbortSignal):Promise<string[]>{
+ if(!/^\d+$/.test(mediaId))return [];
+ const query='query ($id:Int){Media(id:$id,type:MANGA){title{userPreferred english romaji native} synonyms}}';
+ const requestSignal=AbortSignal.any([signal,AbortSignal.timeout(5_000)]);
+ const response=await fetch('https://graphql.anilist.co',{method:'POST',signal:requestSignal,headers:{'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify({query,variables:{id:Number(mediaId)}})});
+ if(!response.ok)throw new Error(`AniList returned HTTP ${response.status}.`);
+ const payload=await response.json() as {data?:{Media?:{title?:Record<string,unknown>;synonyms?:unknown[]}}};
+ const media=payload.data?.Media;
+ return [...new Set([...Object.values(media?.title||{}),...(Array.isArray(media?.synonyms)?media.synonyms:[])].filter((value):value is string=>typeof value==='string').map(value=>value.trim()).filter(Boolean))].slice(0,8);
+}
+async function openLibraryMangaTitles(title:string,alternateTitles:string[],signal:AbortSignal):Promise<MangaSeriesDetail>{
+ const titles=[...new Set([title,...alternateTitles].map(value=>value.trim()).filter(Boolean))].slice(0,5);
+ const attempts=await Promise.allSettled(titles.map(value=>fetchOpenLibraryMangaSeries(value,signal)));
+ if(signal.aborted)throw signal.reason||new DOMException('Request cancelled.','AbortError');
+ const successful=attempts.flatMap(attempt=>attempt.status==='fulfilled'?[attempt.value]:[]);
+ const withVolumes=successful.filter(detail=>detail.volumes.length);
+ if(!withVolumes.length){if(successful.length)return successful[0];const failed=attempts.find(attempt=>attempt.status==='rejected');throw failed?.status==='rejected'?failed.reason:new Error('Open Library returned no manga records.');}
+ return withVolumes.slice(1).reduce((combined,detail)=>mergeMangaSeriesDetails(combined,detail),withVolumes[0]);
+}
+export async function getMangaSeriesDetail(title:string,id:string|undefined,signal:AbortSignal,provider?:string,mediaId?:string,alternateTitles:string[]=[]):Promise<MangaSeriesDetail>{
  const params=new URLSearchParams();
  const mangaDexId=id?.startsWith('manga:mangadex:')?id.slice('manga:mangadex:'.length):'';
  if(mangaDexId)params.set('id',mangaDexId);
  params.set('title',title.slice(0,180));
  if(provider==='Jikan / MyAnimeList'&&/^\d+$/.test(mediaId||''))params.set('malId',mediaId!);
  const timeout=AbortSignal.timeout(MANGA_DETAIL_REQUEST_TIMEOUT_MS),requestSignal=AbortSignal.any([signal,timeout]);
- let response:Response;
- try{response=await fetch(apiUrl('/api/manga-detail')+'?'+params.toString(),{signal:requestSignal,headers:{Accept:'application/json'}});}
- catch(error){if(signal.aborted)throw error;if(timeout.aborted)throw new Error('Loading manga artwork took too long. Try again.');throw new Error(hasBackend?'Manga artwork sources are temporarily unavailable.':'Connect the RUPA Worker to load manga artwork.');}
- const payload=await response.json().catch(()=>null) as unknown;
- if(!response.ok){const message=payload&&typeof payload==='object'&&'error'in payload?String((payload as {error?:unknown}).error||''):'';throw new Error(message||`Manga artwork sources returned HTTP ${response.status}.`);}
- if(!payload||typeof payload!=='object'||!Array.isArray((payload as MangaSeriesDetail).volumes)||typeof (payload as MangaSeriesDetail).title!=='string')throw new Error('Manga sources returned an incomplete series record.');
- return payload as MangaSeriesDetail;
+ let workerDetail:MangaSeriesDetail|undefined,workerError:unknown;
+ const aliases=new Set(alternateTitles.filter(value=>typeof value==='string').map(value=>value.trim()).filter(value=>value&&value.toLocaleLowerCase()!==title.trim().toLocaleLowerCase()));
+ if(provider==='AniList'&&mediaId){try{for(const value of await aniListMangaAliases(mediaId,signal))if(value.toLocaleLowerCase()!==title.trim().toLocaleLowerCase())aliases.add(value);}catch(error){if(signal.aborted)throw error;}}
+ try{
+  const response=await fetch(apiUrl('/api/manga-detail')+'?'+params.toString(),{signal:requestSignal,headers:{Accept:'application/json'}});
+  const payload=await response.json().catch(()=>null) as unknown;
+  if(!response.ok){const message=payload&&typeof payload==='object'&&'error'in payload?String((payload as {error?:unknown}).error||''):'';throw new Error(message||`Manga artwork sources returned HTTP ${response.status}.`);}
+  if(!payload||typeof payload!=='object'||!Array.isArray((payload as MangaSeriesDetail).volumes)||typeof (payload as MangaSeriesDetail).title!=='string')throw new Error('Manga sources returned an incomplete series record.');
+  workerDetail=payload as MangaSeriesDetail;
+  if(workerDetail.volumes.length){
+   try{return mergeMangaSeriesDetails(workerDetail,await openLibraryMangaTitles(title,[...aliases],signal));}
+   catch(error){if(signal.aborted)throw error;return workerDetail;}
+  }
+ }catch(error){
+  if(signal.aborted)throw error;
+  workerError=error;
+ }
+
+ // GitHub Pages has no Worker runtime of its own. Keep manga volume lookup usable there
+ // by querying Open Library directly when the optional Worker route is missing, unavailable,
+ // or has no numbered cover records for this series.
+ try{
+  const fallback=await openLibraryMangaTitles(title,[...aliases],signal);
+  if(workerDetail)return fallback.volumes.length?mergeMangaSeriesDetails(workerDetail,fallback):workerDetail;
+  return fallback;
+ }catch(error){
+  if(signal.aborted)throw error;
+  if(workerDetail)return workerDetail;
+  if(timeout.aborted)throw new Error('Loading manga artwork took too long. Try again.');
+  if(workerError instanceof Error)throw new Error(`${workerError.message} Open Library fallback: ${error instanceof Error?error.message:'unavailable'}`);
+  throw error;
+ }
 }
 function isAppleImageUrl(url:URL) {
   const host=url.hostname.toLowerCase();
@@ -560,8 +605,9 @@ function publicAnimeMangaItems(data:any,category:'anime'|'manga',provider:'AniLi
    const image=String(entry?.coverImage?.extraLarge||entry?.coverImage?.large||'').trim();
    const id=String(entry?.id||'');
    if(!title||!image||!id)return [];
-   const year=Number(entry?.startDate?.year||entry?.seasonYear);
-   return [{id:`${category}:anilist:${id}`,category,title,subtitle:`AniList ${category} catalogue`,year:Number.isInteger(year)&&year>0?String(year):undefined,previewUrl:String(entry?.coverImage?.large||image),imageUrl:image,downloadUrl:image,sourceUrl:String(entry?.siteUrl||`https://anilist.co/${category}/${id}`),source:'AniList',provider:'AniList',mediaId:id,kind:category==='anime'?'poster':'cover',rights:'source-only'} as Artwork];
+    const year=Number(entry?.startDate?.year||entry?.seasonYear);
+    const alternateTitles=category==='manga'?[entry?.title?.english,entry?.title?.romaji,entry?.title?.native,...(Array.isArray(entry?.synonyms)?entry.synonyms:[])].filter((value:any):value is string=>typeof value==='string'&&Boolean(value.trim())&&value.trim()!==title).map((value:string)=>value.trim()).filter((value:string,index:number,all:string[])=>all.indexOf(value)===index):undefined;
+    return [{id:`${category}:anilist:${id}`,category,title,subtitle:`AniList ${category} catalogue`,year:Number.isInteger(year)&&year>0?String(year):undefined,previewUrl:String(entry?.coverImage?.large||image),imageUrl:image,downloadUrl:image,sourceUrl:String(entry?.siteUrl||`https://anilist.co/${category}/${id}`),source:'AniList',provider:'AniList',mediaId:id,alternateTitles,kind:category==='anime'?'poster':'cover',rights:'source-only'} as Artwork];
   }
   if(provider==='Jikan / MyAnimeList'){
    const id=String(entry?.mal_id||''),title=String(entry?.title_english||entry?.title||entry?.title_japanese||'').trim();
@@ -571,21 +617,23 @@ function publicAnimeMangaItems(data:any,category:'anime'|'manga',provider:'AniLi
    const date=String(category==='anime'?entry?.aired?.from:entry?.published?.from||'');
    const year=date.match(/\b(19|20)\d{2}\b/)?.[0];
    const type=category==='anime'?'anime':'manga';
-   return [{id:`${category}:jikan:${id}`,category,title,subtitle:String(entry?.type||`${category} artwork`),year,previewUrl:preview,imageUrl:image,downloadUrl:image,sourceUrl:`https://myanimelist.net/${type}/${id}`,source:'Jikan / MyAnimeList',provider:'Jikan / MyAnimeList',mediaId:id,kind:category==='anime'?'poster':'cover',rights:'source-only'} as Artwork];
+    const alternateTitles=category==='manga'?[entry?.title_english,entry?.title,entry?.title_japanese,...(Array.isArray(entry?.title_synonyms)?entry.title_synonyms:[])].filter((value:any):value is string=>typeof value==='string'&&Boolean(value.trim())&&value.trim()!==title).map((value:string)=>value.trim()).filter((value:string,index:number,all:string[])=>all.indexOf(value)===index):undefined;
+    return [{id:`${category}:jikan:${id}`,category,title,subtitle:String(entry?.type||`${category} artwork`),year,previewUrl:preview,imageUrl:image,downloadUrl:image,sourceUrl:`https://myanimelist.net/${type}/${id}`,source:'Jikan / MyAnimeList',provider:'Jikan / MyAnimeList',mediaId:id,alternateTitles,kind:category==='anime'?'poster':'cover',rights:'source-only'} as Artwork];
   }
   const id=String(entry?.id||''),attributes=entry?.attributes||{};
    const title=String(attributes?.title?.en||attributes?.title?.['ja-ro']||attributes?.title?.ja||Object.values(attributes?.title||{})[0]||'').trim();
+   const alternateTitles=[...Object.values(attributes?.title||{}),...(Array.isArray(attributes?.altTitles)?attributes.altTitles.flatMap((row:any)=>Object.values(row||{})):[])].filter((value:any):value is string=>typeof value==='string'&&Boolean(value.trim())&&value.trim()!==title).map((value:string)=>value.trim()).filter((value:string,index:number,all:string[])=>all.indexOf(value)===index);
   const cover=Array.isArray(entry?.relationships)?entry.relationships.find((item:any)=>item?.type==='cover_art'):undefined;
   const fileName=String(cover?.attributes?.fileName||'').trim();
   if(!id||!title||!fileName)return [];
   const image=`https://uploads.mangadex.org/covers/${encodeURIComponent(id)}/${encodeURIComponent(fileName)}`;
   const year=Number(attributes?.year);
-  return [{id:`manga:mangadex:${id}`,category:'manga',title,subtitle:'MangaDex · cover art',year:Number.isInteger(year)&&year>0?String(year):undefined,previewUrl:`${image}.256.jpg`,imageUrl:`${image}.512.jpg`,downloadUrl:`${image}.512.jpg`,sourceUrl:`https://mangadex.org/title/${encodeURIComponent(id)}`,source:'MangaDex',provider:'MangaDex',mediaId:id,kind:'cover',rights:'source-only'} as Artwork];
+   return [{id:`manga:mangadex:${id}`,category:'manga',title,subtitle:'MangaDex · cover art',year:Number.isInteger(year)&&year>0?String(year):undefined,previewUrl:`${image}.256.jpg`,imageUrl:`${image}.512.jpg`,downloadUrl:`${image}.512.jpg`,sourceUrl:`https://mangadex.org/title/${encodeURIComponent(id)}`,source:'MangaDex',provider:'MangaDex',mediaId:id,alternateTitles,kind:'cover',rights:'source-only'} as Artwork];
  });
 }
 async function searchPublicAnimeMangaSource(query:string,category:'anime'|'manga',source:'anilist'|'jikan'|'mangadex',signal?:AbortSignal):Promise<Artwork[]>{
  if(source==='anilist'){
-  const gql='query ($search:String,$type:MediaType){Page(page:1,perPage:20){media(search:$search,type:$type,isAdult:false){id title{userPreferred english romaji native} coverImage{large extraLarge} format seasonYear startDate{year} siteUrl}}}';
+  const gql='query ($search:String,$type:MediaType){Page(page:1,perPage:20){media(search:$search,type:$type,isAdult:false){id title{userPreferred english romaji native} synonyms coverImage{large extraLarge} format seasonYear startDate{year} siteUrl}}}';
   const data=await json('https://graphql.anilist.co',signal,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({query:gql,variables:{search:query,type:category==='anime'?'ANIME':'MANGA'}})});
   return publicAnimeMangaItems(data,category,'AniList');
  }

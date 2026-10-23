@@ -19,9 +19,9 @@ export function MangaDetailPage({series,favoriteIds,onFavorite,onOpen,onBack}:{s
  useEffect(()=>{
   const controller=new AbortController();let active=true,timedOut=false;const timer=window.setTimeout(()=>{timedOut=true;controller.abort();},30_000);
   setLoading(true);setError('');setDetail(null);
-  void getMangaSeriesDetail(series.title,series.id,controller.signal,series.provider||series.source,series.mediaId).then(value=>{if(active)setDetail(value);}).catch(reason=>{if(active)setError(timedOut?'Loading manga artwork took too long. Try again.':reason instanceof Error?reason.message:'Manga artwork could not be loaded.');}).finally(()=>{window.clearTimeout(timer);if(active)setLoading(false);});
+  void getMangaSeriesDetail(series.title,series.id,controller.signal,series.provider||series.source,series.mediaId,series.alternateTitles||[]).then(value=>{if(active)setDetail(value);}).catch(reason=>{if(active)setError(timedOut?'Loading manga artwork took too long. Try again.':reason instanceof Error?reason.message:'Manga artwork could not be loaded.');}).finally(()=>{window.clearTimeout(timer);if(active)setLoading(false);});
   return()=>{active=false;window.clearTimeout(timer);controller.abort();};
- },[series.id,series.title,series.provider,series.source,series.mediaId,attempt]);
+ },[series.id,series.title,series.provider,series.source,series.mediaId,series.alternateTitles,attempt]);
  const volumes=useMemo(()=>{const items=detail?.volumes||[];return sort==='ascending'?items:[...items].reverse();},[detail?.volumes,sort]);
  const backdrop=useMemo(()=>{const images=[series.previewUrl,series.imageUrl,...(detail?.volumes||[]).slice(0,8).map(item=>item.previewUrl)].filter(Boolean);return images.length?images[Math.floor(Math.random()*images.length)]:'';},[series.id,detail?.id]);
  return <section className="content-width manga-detail-page" aria-labelledby="manga-detail-title">

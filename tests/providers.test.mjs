@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { appleArtworkSizedUrl, appleOriginalArtworkUrl, downloadLink, fetchAppleTrendArtwork, fetchAppleTrendArtworkWithAvailability, getAppleMotionArtwork, getMangaSeriesDetail, searchArtwork } from '../src/lib/providers.ts';
+import { mapOpenLibraryMangaSeries } from '../src/lib/mangaCatalog.ts';
 import { fetchPublicChart } from '../src/lib/publicCharts.ts';
 
 test('physical media merges mirrored and indexed artwork for the same Wikidata entity',async()=>{
@@ -77,17 +78,109 @@ test('MangaDex category search can fall back directly and maps its cover relatio
 });
 
 test('Manga detail passes a Jikan series ID to the Worker for an exact fallback lookup',async()=>{
-  const original=globalThis.fetch;let requested;
+  const original=globalThis.fetch,requested=[];
   globalThis.fetch=async input=>{
-    requested=new URL(typeof input==='string'?input:input.url||input,'https://rupa.test');
+    const url=new URL(typeof input==='string'?input:input.url||input,'https://rupa.test');requested.push(url);
+    if(url.hostname==='openlibrary.org')return Response.json({docs:[]});
     return Response.json({id:'jikan:13',title:'One Piece',description:'',status:'Publishing',lastVolume:'',authors:[],source:'Jikan / MyAnimeList',sourceUrl:'https://myanimelist.net/manga/13',volumes:[],galleryLabel:'Related cover artwork'});
   };
   try{
     const detail=await getMangaSeriesDetail('One Piece','manga:anilist:30013',new AbortController().signal,'Jikan / MyAnimeList','13');
-    assert.equal(requested.pathname,'/api/manga-detail');
-    assert.equal(requested.searchParams.get('title'),'One Piece');
-    assert.equal(requested.searchParams.get('malId'),'13');
+    assert.equal(requested[0].pathname,'/api/manga-detail');
+    assert.equal(requested[0].searchParams.get('title'),'One Piece');
+    assert.equal(requested[0].searchParams.get('malId'),'13');
+    assert.equal(requested[1].hostname,'openlibrary.org');
     assert.equal(detail.source,'Jikan / MyAnimeList');
+  }finally{globalThis.fetch=original;}
+});
+
+test('Open Library manga volume mapping supports several series and excludes similarly named works',()=>{
+  const fixtures=[
+    {series:'One Piece',record:'ONE PIECE 1',expected:'Volume 1'},
+    {series:'Naruto',record:'Naruto Vol. 72',expected:'Volume 72'},
+    {series:'Attack on Titan',record:'Attack On Titan, Vol. 1',expected:'Volume 1'},
+    {series:'Berserk',record:'Berserk Deluxe Volume 1',expected:'Volume 1 · Deluxe'},
+    {series:'Demon Slayer',record:'Demon Slayer #1-8',expected:'Volumes 1–8'},
+  ];
+  for(const [index,fixture] of fixtures.entries()){
+    const detail=mapOpenLibraryMangaSeries(fixture.series,{docs:[
+      {title:fixture.record,cover_i:100+index,key:`/works/OL${100+index}W`,first_publish_year:1997,author_name:['Author']},
+      {title:`${fixture.series} Party 1`,cover_i:999,key:'/works/OL999W'},
+    ]});
+    assert.equal(detail.volumes.length,1,fixture.series);
+    assert.equal(detail.volumes[0].subtitle,`${fixture.expected} · Open Library`,fixture.series);
+    assert.equal(detail.volumes[0].sourceUrl,`https://openlibrary.org/works/OL${100+index}W`,fixture.series);
+  }
+});
+
+test('production manga detail falls back to Open Library when GitHub Pages has no Worker route',async()=>{
+  const original=globalThis.fetch,requested=[];
+  globalThis.fetch=async input=>{
+    const url=new URL(typeof input==='string'?input:input.url||input,'https://rupa.test');requested.push(url);
+    if(url.pathname==='/api/manga-detail')return new Response('not found',{status:404});
+    if(url.hostname==='openlibrary.org')return Response.json({docs:[
+      {title:'Naruto 1',cover_i:1020563,key:'/works/OL8215661W',first_publish_year:1999,author_name:['Masashi Kishimoto']},
+      {title:'Naruto 2',cover_i:9609527,key:'/works/OL8215662W',first_publish_year:2000,author_name:['Masashi Kishimoto']},
+    ]});
+    throw new Error(`unexpected provider URL ${url}`);
+  };
+  try{
+    const detail=await getMangaSeriesDetail('Naruto','manga:anilist:30002',new AbortController().signal,'AniList','30002');
+    assert.deepEqual(requested.map(url=>url.hostname),['graphql.anilist.co','rupa.test','openlibrary.org']);
+    assert.deepEqual(detail.volumes.map(item=>item.subtitle),['Volume 1 · Open Library','Volume 2 · Open Library']);
+    assert.equal(detail.volumes[0].previewUrl,'https://covers.openlibrary.org/b/id/1020563-M.jpg');
+    assert.equal(detail.volumes[1].sourceUrl,'https://openlibrary.org/works/OL8215662W');
+    assert.equal(detail.authors[0],'Masashi Kishimoto');
+  }finally{globalThis.fetch=original;}
+});
+
+test('manga detail merges Worker and Open Library volume covers without replacing the primary edition',async()=>{
+  const original=globalThis.fetch,requested=[];
+  globalThis.fetch=async input=>{
+    const url=new URL(typeof input==='string'?input:input.url||input,'https://rupa.test');requested.push(url);
+    if(url.pathname==='/api/manga-detail')return Response.json({
+      id:'mangadex-chainsaw-man',title:'Chainsaw Man',description:'Series description',status:'completed',lastVolume:'16',authors:['Tatsuki Fujimoto'],source:'MangaDex',sourceUrl:'https://mangadex.org/title/example',volumes:[
+        {id:'mangadex-volume-1',category:'manga',title:'Chainsaw Man · Volume 1',subtitle:'Volume 1 · EN',source:'MangaDex',provider:'MangaDex',sourceUrl:'https://mangadex.org/title/example',previewUrl:'https://mangadex.test/volume-1.jpg',imageUrl:'https://mangadex.test/volume-1-large.jpg',kind:'cover'},
+      ]});
+    if(url.hostname==='openlibrary.org')return Response.json({docs:[
+      {title:'Chainsaw Man Vol. 1',cover_i:102, key:'/works/OL100W', first_publish_year:2018, author_name:['Tatsuki Fujimoto']},
+      {title:'Chainsaw Man Vol. 2',cover_i:103, key:'/works/OL101W', first_publish_year:2018, author_name:['Tatsuki Fujimoto']},
+    ]});
+    throw new Error(`unexpected provider URL ${url}`);
+  };
+  try{
+    const detail=await getMangaSeriesDetail('Chainsaw Man','manga:mangadex:example',new AbortController().signal,'MangaDex');
+    assert.deepEqual(requested.map(url=>url.hostname),['rupa.test','openlibrary.org']);
+    assert.equal(detail.title,'Chainsaw Man');
+    assert.equal(detail.description,'Series description');
+    assert.deepEqual(detail.authors,['Tatsuki Fujimoto']);
+    assert.deepEqual(detail.volumes.map(item=>item.subtitle),['Volume 1 · EN','Volume 2 · Open Library']);
+    assert.equal(detail.volumes[0].previewUrl,'https://mangadex.test/volume-1.jpg');
+    assert.equal(detail.volumes[1].previewUrl,'https://covers.openlibrary.org/b/id/103-M.jpg');
+    assert.match(detail.detailNote,/MangaDex and Open Library/);
+  }finally{globalThis.fetch=original;}
+});
+
+test('AniList manga detail searches Open Library with alternate series titles',async()=>{
+  const original=globalThis.fetch,queries=[];
+  globalThis.fetch=async(input,init)=>{
+    const url=new URL(typeof input==='string'?input:input.url||input,'https://rupa.test');
+    if(url.hostname==='graphql.anilist.co')return Response.json({data:{Media:{title:{userPreferred:'Shingeki no Kyojin',english:'Attack on Titan',romaji:'Shingeki no Kyojin',native:'進撃の巨人'},synonyms:[]}}});
+    if(url.pathname==='/api/manga-detail')return new Response('not found',{status:404});
+    if(url.hostname==='openlibrary.org'){
+      const query=url.searchParams.get('q');queries.push(query);
+      const docs=query==='Attack on Titan'?
+        [{title:'Attack on Titan Vol. 1',cover_i:201,key:'/works/OL201W'},{title:'Attack on Titan Vol. 2',cover_i:202,key:'/works/OL202W'}]:
+        query==='Shingeki no Kyojin'?
+        [{title:'Shingeki no Kyojin Vol. 11',cover_i:211,key:'/works/OL211W'}]:[];
+      return Response.json({docs});
+    }
+    throw new Error(`unexpected provider URL ${url}`);
+  };
+  try{
+    const detail=await getMangaSeriesDetail('Shingeki no Kyojin','manga:anilist:53390',new AbortController().signal,'AniList','53390');
+    assert.ok(queries.includes('Attack on Titan'),`Open Library queries: ${queries.join(', ')}`);
+    assert.deepEqual(detail.volumes.map(item=>item.subtitle),['Volume 1 · Open Library','Volume 2 · Open Library','Volume 11 · Open Library']);
   }finally{globalThis.fetch=original;}
 });
 
