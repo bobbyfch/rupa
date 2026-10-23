@@ -675,3 +675,208 @@ body,.app-root,.ca-dialog,.ca-dialog button,.ca-dialog input,.ca-dialog select {
   .art-strip-card:not(.image-ready),.art-strip-card:not(.image-ready)::before { animation: none; }
   .category-card:hover { transform: none; }
 }
+
+/* Shared liquid-glass surfaces and flat collection sections. */
+:root {
+  --bg: #f8f8fc;
+  --soft: #eff0f7;
+  --tile: #f0eff8;
+  --glass: color-mix(in srgb, #fff 67%, transparent);
+  --glass-line: color-mix(in srgb, #fff 72%, #b9c4dc);
+  --glass-shadow: inset 0 1px 0 #ffffffd9, 0 24px 64px -45px #28365d87;
+  --liquid-radius: 23px;
+  --liquid-surface: color-mix(in srgb, var(--canvas) 72%, transparent);
+  --liquid-blur: 20px;
+}
+:root[data-theme="dark"] {
+  --bg: #11121a;
+  --soft: #222532;
+  --tile: #292d3b;
+  --glass: color-mix(in srgb, #202331 77%, transparent);
+  --glass-line: #ffffff26;
+  --glass-shadow: inset 0 1px 0 #ffffff1b, 0 24px 64px -40px #000b;
+}
+:root[data-theme="dark"][data-oled="true"] {
+  --bg: #000;
+  --canvas: #07080b;
+  --soft: #101115;
+  --tile: #15171c;
+  --glass: #08090de8;
+  --glass-line: #ffffff24;
+}
+html, body, #root, .app-root {
+  background:
+    radial-gradient(ellipse at 7% 0%, color-mix(in srgb,var(--accent) 6%,transparent),transparent 42%),
+    radial-gradient(ellipse at 94% 24%, color-mix(in srgb,#647dff 5%,transparent),transparent 44%),
+    var(--bg);
+}
+:root[data-theme="dark"][data-oled="true"],
+:root[data-theme="dark"][data-oled="true"] body,
+:root[data-theme="dark"][data-oled="true"] #root,
+:root[data-theme="dark"][data-oled="true"] .app-root { background: #000; }
+
+.ghibli-timeline-block { margin: 21px 0 39px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.ghibli-section-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
+.collection-film-timeline-shell { display: grid; grid-template-columns: 36px minmax(0,1fr) 36px; align-items: center; gap: 9px; min-width: 0; }
+.collection-timeline-arrow { width: 36px; height: 36px; display: grid; place-items: center; padding: 0; border: 1px solid var(--glass-line); border-radius: 50%; background: var(--glass); color: var(--ink); box-shadow: inset 0 1px 0 #ffffff9c,0 8px 22px -18px #18203a; backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); cursor: pointer; transition: transform .18s ease,opacity .18s ease,border-color .18s ease; }
+.collection-timeline-arrow:hover:not(:disabled) { transform: scale(1.06); border-color: color-mix(in srgb,var(--accent) 45%,var(--glass-line)); }
+.collection-timeline-arrow:disabled { opacity: .3; cursor: default; }
+.collection-film-timeline { min-width: 0; display: flex; gap: 9px; overflow-x: auto; overflow-y: hidden; padding: 2px 1px 5px; scrollbar-width: none; scroll-snap-type: x mandatory; overscroll-behavior-inline: contain; }
+.collection-film-timeline::-webkit-scrollbar { display: none; }
+.ghibli-film-tag { flex: 0 0 clamp(158px,16vw,196px); min-width: 0; min-height: 75px; height: 75px; display: flex; flex-direction: row; align-items: center; gap: 9px; padding: 7px; border: 1px solid var(--glass-line); border-radius: 18px; background: var(--liquid-surface); color: var(--ink); box-shadow: inset 0 1px 0 #ffffffb8,0 12px 26px -23px #182342a3; backdrop-filter: blur(17px) saturate(150%); -webkit-backdrop-filter: blur(17px) saturate(150%); text-align: left; scroll-snap-align: start; }
+.ghibli-film-tag>img,.ghibli-film-tag>.ghibli-image-fallback { flex: 0 0 43px; width: 43px; height: 59px; min-height: 59px; border-radius: 11px; object-fit: cover; }
+.ghibli-film-tag>.ghibli-image-fallback { gap: 3px; overflow: hidden; font-size: 7px; text-align: center; }
+.ghibli-film-tag-copy { min-width: 0; display: flex; flex: 1; flex-direction: column; align-items: flex-start; gap: 3px; }
+.ghibli-film-tag-copy>span { color: var(--muted); font: 600 8px "IBM Plex Mono",monospace; }
+.ghibli-film-tag-copy>strong { display: -webkit-box; max-width: 100%; overflow: hidden; color: var(--ink); font-size: 10px; font-weight: 680; line-height: 1.25; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.ghibli-film-tag-copy>small { overflow: hidden; max-width: 100%; color: var(--accent); font: 500 7px "IBM Plex Mono",monospace; text-overflow: ellipsis; white-space: nowrap; }
+.ghibli-film-tag.active { border-color: color-mix(in srgb,var(--accent) 68%,var(--glass-line)); background: color-mix(in srgb,var(--accent) 11%,var(--liquid-surface)); box-shadow: 0 0 0 2px color-mix(in srgb,var(--accent) 18%,transparent),inset 0 1px 0 #ffffffb8; }
+.ghibli-year-tags { margin-bottom: 10px; }
+
+.ghibli-poster-archive { margin: 30px 0 47px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.ghibli-poster-heading,.ghibli-gallery-heading { margin-bottom: 15px; }
+.ghibli-poster-archive>p { margin-bottom: 18px; }
+.ghibli-poster-grid,.ghibli-still-grid { column-gap: clamp(13px,1.6vw,22px); }
+.ghibli-poster-card,.ghibli-still-card,.shinkai-gallery-card,.shinkai-exhibition-card,.game-cover-card,.game-title-group,.game-detail-asset,.category-card,.apple-trend-card {
+  border: 1px solid var(--glass-line);
+  border-radius: var(--liquid-radius);
+  background: var(--liquid-surface);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(145%);
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(145%);
+}
+.ghibli-poster-card,.ghibli-still-card,.shinkai-gallery-card,.shinkai-exhibition-card,.game-cover-card,.game-title-group,.game-detail-asset { overflow: hidden; }
+.ghibli-poster-image,.ghibli-still-image,.shinkai-gallery-image,.shinkai-exhibition-image,.game-title-cover,.game-detail-image { overflow: hidden; border-radius: 0; }
+.ghibli-poster-image>span:not(.ghibli-image-fallback),.ghibli-still-image>span:not(.ghibli-image-fallback) { position: absolute; inset: auto 8px 8px auto; z-index: 2; width: max-content; height: auto; max-width: calc(100% - 16px); display: inline-flex; align-items: center; justify-content: center; margin: 0; padding: 6px 9px; border: 1px solid #ffffff89; border-radius: 999px; background: #111725c9; color: #fff; font: 600 9px "IBM Plex Mono",monospace; line-height: 1; text-align: center; white-space: nowrap; backdrop-filter: blur(14px) saturate(155%); pointer-events: none; }
+.ghibli-poster-image>.ghibli-image-fallback,.ghibli-still-image>.ghibli-image-fallback { position: static; inset: auto; width: 100%; min-height: 165px; height: auto; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 0; background: linear-gradient(145deg,var(--tile),var(--soft)); color: var(--muted); white-space: normal; }
+.shinkai-image-year,.shinkai-exhibition-image>span:last-child { min-width: 0; width: max-content; max-width: calc(100% - 16px); height: auto; padding: 6px 9px; border: 1px solid #ffffff89; border-radius: 999px; background: #111725c9; color: #fff; font: 600 9px "IBM Plex Mono",monospace; line-height: 1; backdrop-filter: blur(14px) saturate(155%); }
+.ghibli-poster-info,.ghibli-still-info,.shinkai-gallery-card>div,.shinkai-exhibition-card>div { padding: 12px 13px 8px; }
+.ghibli-poster-info strong,.ghibli-still-info strong,.shinkai-gallery-card strong,.shinkai-exhibition-card strong { color: var(--ink); font-size: 11px; font-weight: 680; }
+.collection-art-source,.ghibli-poster-source,.shinkai-gallery-source { display: inline-flex; align-items: center; gap: 5px; padding: 2px 13px 12px; color: var(--muted); font-size: 9px; text-decoration: none; }
+.collection-art-source:hover,.ghibli-poster-source:hover,.shinkai-gallery-source:hover { color: var(--accent); }
+.shinkai-exhibition-grid { gap: clamp(12px,1.5vw,20px); }
+.shinkai-exhibition-card>div { gap: 5px; }
+
+.game-trending-section { margin: 34px 0 30px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.game-trending-card { overflow: visible; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.game-trending-card>button { display: flex; flex-direction: column; gap: 0; overflow: hidden; border: 1px solid var(--glass-line); border-radius: 22px; background: var(--liquid-surface); color: var(--ink); box-shadow: var(--glass-shadow); backdrop-filter: blur(18px) saturate(145%); -webkit-backdrop-filter: blur(18px) saturate(145%); }
+.game-trending-card>button>img,.game-trending-fallback { flex: none; width: 100%; aspect-ratio: 16/9; object-fit: cover; }
+.game-trending-title { padding: 10px 12px 3px; }
+.game-trending-action { min-height: 32px; display: inline-flex; align-items: center; justify-content: space-between; margin: 0 12px 10px; padding: 3px 0; border-top: 1px solid var(--glass-line); border-radius: 0; background: transparent; color: var(--accent); font-size: 10px; }
+.game-trending-card>a { display: inline-flex; margin: 6px 3px 0; color: var(--muted); font-size: 9px; text-decoration: none; }
+.game-facts { padding: 20px 22px; border: 1px solid var(--glass-line); border-radius: 25px; background: linear-gradient(135deg,color-mix(in srgb,var(--canvas) 68%,transparent),color-mix(in srgb,var(--accent) 5%,var(--canvas))); box-shadow: var(--glass-shadow); backdrop-filter: blur(22px) saturate(145%); -webkit-backdrop-filter: blur(22px) saturate(145%); }
+.game-facts-grid { gap: 0; }
+.game-facts-grid>div { min-height: 58px; padding: 9px 14px; border: 0; border-left: 1px solid var(--glass-line); border-radius: 0; background: transparent; }
+.game-facts-grid>div:first-child { border-left: 0; }
+.game-platform-facts { display: flex; flex-wrap: wrap; gap: 4px; }
+.game-platform-facts>span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.game-platform-facts button { padding: 0; border: 0; border-bottom: 1px dotted color-mix(in srgb,var(--accent) 60%,transparent); background: transparent; color: var(--accent); font: inherit; cursor: pointer; }
+.game-platform-facts button:hover { border-bottom-style: solid; }
+.game-platform-browse-heading { display: flex; align-items: end; justify-content: space-between; gap: 20px; margin: 26px 0 8px; }
+.game-platform-browse-heading h2 { margin: 7px 0 3px; font-size: clamp(24px,3.4vw,38px); letter-spacing: -.07em; }
+.game-platform-browse-heading p { margin: 0; color: var(--muted); font-size: 11px; }
+.game-platform-browse-heading>a { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); font-size: 10px; text-decoration: none; }
+
+.game-detail-header { position: relative; isolation: isolate; overflow: hidden; min-height: 230px; align-items: end; margin: 27px 0 23px; padding: clamp(22px,4vw,46px); border: 1px solid var(--glass-line); border-radius: 29px; background: linear-gradient(120deg,color-mix(in srgb,var(--canvas) 88%,transparent),color-mix(in srgb,var(--glass) 62%,transparent)); box-shadow: var(--glass-shadow); backdrop-filter: blur(18px) saturate(145%); -webkit-backdrop-filter: blur(18px) saturate(145%); }
+.game-detail-backdrop { position: absolute; z-index: -1; inset: 0; overflow: hidden; border-radius: inherit; pointer-events: none; }
+.game-detail-backdrop>img { position: absolute; inset: 0 0 0 auto; width: min(76%,900px); height: 100%; object-fit: cover; object-position: center 38%; opacity: .35; filter: saturate(.82); mask-image: linear-gradient(90deg,transparent 0%,#000 34%); }
+.game-detail-backdrop::after { position: absolute; inset: 0; background: linear-gradient(90deg,var(--canvas) 0%,color-mix(in srgb,var(--canvas) 77%,transparent) 35%,transparent 100%),linear-gradient(0deg,color-mix(in srgb,var(--canvas) 35%,transparent),transparent 60%); content: ""; }
+.game-detail-header h1 { max-width: 930px; overflow-wrap: anywhere; font-size: clamp(42px,6vw,78px); }
+.game-detail-links { position: relative; z-index: 1; flex-wrap: wrap; }
+.game-detail-links>a { border: 1px solid var(--glass-line); border-radius: 999px; background: var(--glass); backdrop-filter: blur(17px) saturate(150%); -webkit-backdrop-filter: blur(17px) saturate(150%); }
+
+.console-rail { max-height: 300px; gap: 8px; }
+.console-select { min-height: 62px; height: auto; flex-direction: row; align-items: center; justify-content: flex-start; gap: 9px; padding: 9px 10px; border: 1px solid var(--glass-line); border-radius: 17px; background: var(--liquid-surface); box-shadow: inset 0 1px 0 #ffffffa3,0 10px 25px -24px #1b2748; backdrop-filter: blur(17px) saturate(145%); -webkit-backdrop-filter: blur(17px) saturate(145%); }
+.console-option.active { border-color: color-mix(in srgb,var(--accent) 64%,var(--glass-line)); background: color-mix(in srgb,var(--accent) 9%,var(--liquid-surface)); }
+.console-platform-mark { position: relative; width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border: 1px solid #ffffffa1; border-radius: 12px; background: linear-gradient(145deg,#ffffffd6,color-mix(in srgb,var(--accent) 17%,var(--soft))); color: var(--ink); box-shadow: inset 0 1px 0 #fff,0 6px 16px -13px #111827; font-size: 10px; font-weight: 850; letter-spacing: -.05em; }
+.console-platform-mark>img { position: absolute; z-index: 1; width: 19px; height: 19px; object-fit: contain; }
+.console-platform-mark>span { display: grid; place-items: center; }
+.console-platform-mark[data-family="PlayStation"] { color: #255add; }
+.console-platform-mark[data-family="Nintendo"] { color: #e64154; }
+.console-platform-mark[data-family="Xbox"] { color: #167d45; }
+.console-platform-mark[data-family="Sega"] { color: #245dff; }
+.console-option-copy { min-width: 0; display: flex; flex: 1; flex-direction: column; align-items: flex-start; gap: 3px; }
+.console-option-copy>strong { width: 100%; font-size: 10px; font-weight: 700; }
+.console-option-copy>small { width: 100%; color: var(--muted); font-size: 8px; }
+.console-family-tabs button { min-height: 31px; padding-inline: 12px; border: 1px solid var(--glass-line); border-radius: 999px; background: var(--glass); color: var(--muted); box-shadow: inset 0 1px 0 #ffffff8f; }
+.console-family-tabs button.active { border-color: color-mix(in srgb,var(--accent) 55%,var(--glass-line)); background: color-mix(in srgb,var(--accent) 11%,var(--canvas)); color: var(--accent); }
+.console-option-all { min-height: 62px; align-items: center; }
+
+/* Dialog contents scroll independently from their fixed glass title bar. */
+.ca-dialog { display: flex; flex-direction: column; overflow: hidden; }
+.ca-dialog-head { position: sticky; z-index: 4; top: 0; flex: 0 0 auto; }
+.ca-dialog:not(.ca-dialog-wide)>.ca-dialog-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.ca-dialog:not(.ca-dialog-wide)>.ca-dialog-content { background: radial-gradient(ellipse at 100% 0%,color-mix(in srgb,var(--accent) 5%,transparent),transparent 38%),color-mix(in srgb,var(--canvas) 94%,transparent); }
+.ca-dialog-wide { max-height: min(88vh,940px); }
+.ca-dialog-wide>.ca-dialog-content { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.inspector-grid { max-height: none; overflow: visible; background: transparent; }
+.inspector-visual { min-width: 0; background: radial-gradient(ellipse at 50% 42%,#394155 0%,#171c28 62%,#0e1119 100%); }
+.inspection-canvas { background-image: linear-gradient(130deg,#0b0d1488,#101522c2),var(--inspection-art,none); background-position: center; background-size: cover; background-repeat: no-repeat; }
+.inspector-sidebar { background: color-mix(in srgb,var(--canvas) 93%,transparent); }
+.ca-dialog:not(.ca-dialog-wide) .profile-block { margin: 0; padding: 15px 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.ca-dialog:not(.ca-dialog-wide) .profile-block+.profile-block { border-top: 1px solid var(--glass-line); }
+.ca-dialog:not(.ca-dialog-wide) .profile-block:first-child { padding-top: 5px; }
+.ca-dialog:not(.ca-dialog-wide) .profile-block:last-child { padding-bottom: 20px; }
+.ca-dialog:not(.ca-dialog-wide) .inline-input { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: stretch; gap: 8px; }
+.ca-dialog:not(.ca-dialog-wide) .inline-input input { width: 100%; min-width: 0; max-width: none; }
+.ca-dialog:not(.ca-dialog-wide) .inline-input .ca-button { min-width: 92px; }
+.profile-settings-block .locale-row { min-height: 47px; }
+.profile-settings-block .locale-row>span,.accent-setting>span { color: var(--muted); }
+.profile-list>button { border: 1px solid var(--glass-line); border-radius: 16px; background: var(--glass); box-shadow: inset 0 1px 0 #ffffff87; }
+.download-export-panel { margin-top: 23px; padding: 18px 0 4px; border: 0; border-top: 1px solid var(--glass-line); border-radius: 0; background: transparent; box-shadow: none; }
+.download-export-controls label { border: 0; border-radius: 0; background: transparent; }
+.download-export-controls select { border: 1px solid var(--glass-line); border-radius: 12px; background: var(--liquid-surface); }
+.rights-note { border-radius: 17px; background: color-mix(in srgb,var(--accent) 5%,var(--glass)); }
+
+@media (max-width: 760px) {
+  .collection-film-timeline-shell { grid-template-columns: 32px minmax(0,1fr) 32px; gap: 6px; }
+  .collection-timeline-arrow { width: 32px; height: 32px; }
+  .ghibli-film-tag { flex-basis: 158px; min-height: 70px; height: 70px; }
+  .ghibli-film-tag>img,.ghibli-film-tag>.ghibli-image-fallback { flex-basis: 39px; width: 39px; height: 54px; min-height: 54px; }
+  .ghibli-poster-archive { margin: 24px 0 38px; }
+  .game-facts { padding: 15px; }
+  .game-facts-grid>div { padding: 8px 9px; border-left: 0; border-top: 1px solid var(--glass-line); }
+  .game-facts-grid>div:nth-child(-n+2) { border-top: 0; }
+  .game-detail-header { min-height: 210px; align-items: flex-start; padding: 20px; }
+  .game-detail-backdrop>img { width: 100%; opacity: .23; mask-image: linear-gradient(90deg,transparent 0%,#000 43%); }
+  .game-detail-links { margin-top: auto; }
+  .game-platform-browse-heading { align-items: flex-start; flex-direction: column; gap: 10px; }
+  .console-rail { grid-template-columns: repeat(2,minmax(0,1fr)); max-height: 310px; }
+  .ca-dialog:not(.ca-dialog-wide) { height: min(90dvh,800px); }
+  .ca-dialog:not(.ca-dialog-wide) .inline-input { grid-template-columns: minmax(0,1fr) auto; }
+  .ca-dialog-wide { height: min(94dvh,940px); max-height: 94dvh; }
+  .inspector-grid { grid-template-columns: 1fr; }
+  .inspector-visual { min-height: 400px; }
+  .inspection-canvas { min-height: 350px; }
+  .inspector-sidebar { overflow: visible; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .collection-timeline-arrow,.ghibli-film-tag { transition: none; }
+  .collection-timeline-arrow:hover:not(:disabled) { transform: none; }
+}
+
+/* Keep search controls as separate surfaces instead of nesting them in a panel. */
+.game-finder-search { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+.game-query-field { min-height: 56px; padding: 0 16px; border: 1px solid var(--glass-line); border-radius: 19px; background: var(--liquid-surface); box-shadow: inset 0 1px 0 #ffffffb5,0 12px 28px -24px #17203d; backdrop-filter: blur(20px) saturate(150%); -webkit-backdrop-filter: blur(20px) saturate(150%); }
+.console-choice { padding: 15px 0 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+.game-finder-empty>a { display: inline-flex; align-items: center; gap: 7px; margin-top: 8px; color: var(--accent); font-size: 11px; font-weight: 650; text-decoration: none; }
+.game-finder-empty>a:hover { text-decoration: underline; }
+
+/* Shared card finish for image-led surfaces across the archive. */
+.ghibli-collection-card,.shinkai-collection-card,.collection-tile,.music-video-still-card,.moving-artwork-strip.is-unavailable {
+  border: 1px solid var(--glass-line);
+  border-radius: var(--liquid-radius);
+  box-shadow: var(--glass-shadow);
+}
+.ghibli-collection-card,.shinkai-collection-card,.music-video-still-card,.moving-artwork-strip.is-unavailable {
+  background: var(--liquid-surface);
+  backdrop-filter: blur(var(--liquid-blur)) saturate(145%);
+  -webkit-backdrop-filter: blur(var(--liquid-blur)) saturate(145%);
+}
+.collection-tile { border-color: #ffffff9c; box-shadow: inset 0 1px 0 #ffffffb0,0 18px 38px -31px #111827; }
+.music-video-still-card>div { background: color-mix(in srgb,var(--liquid-surface) 92%,transparent); }
+.art-visual { border-radius: var(--liquid-radius); box-shadow: inset 0 1px 0 #ffffff8f,0 16px 32px -27px #111827; }
+.art-img-wrap img { border-radius: inherit; }
+.console-rail { display: grid; grid-template-columns: repeat(auto-fill,minmax(205px,1fr)); align-content: start; overflow-x: hidden; overflow-y: auto; }
+.console-select { width: 100%; min-width: 0; }
+@media (max-width: 760px) { .console-rail { grid-template-columns: repeat(2,minmax(0,1fr)); } }

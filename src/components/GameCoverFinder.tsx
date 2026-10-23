@@ -1,8 +1,8 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ArrowLeft, ArrowRight, Gamepad2, Info, LoaderCircle, Search } from 'lucide-react';
 import type { Artwork } from '../lib/types';
-import { groupGameArtworks, loadManifest, normalizeText, searchGameIndex, searchModernGameIndex, MODERN_GAME_PLATFORMS } from '../lib/catalog';
-import type { GameAssetFilter, IndexManifest } from '../lib/catalog';
+import { browseGamePlatform, groupGameArtworks, loadManifest, normalizeText, searchGameIndex, searchModernGameIndex, MODERN_GAME_PLATFORMS } from '../lib/catalog';
+import type { GameAssetFilter, IndexManifest, PlatformBrowse } from '../lib/catalog';
 import { Button } from './ui/button';
 import { GameConsoleSelector } from './GameConsoleSelector';
 import { GameDetailPage } from './GameDetailPage';
@@ -32,6 +32,7 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
   const [failedImages, setFailedImages] = useState<Set<string>>(() => new Set());
   const [detailGroup,setDetailGroup]=useState<ReturnType<typeof groupGameArtworks>[number]|null>(null);
   const [showSources,setShowSources]=useState(false);
+  const [browseMeta,setBrowseMeta]=useState<PlatformBrowse|null>(null);
   const request = useRef<AbortController | null>(null);
 
   useEffect(() => {
@@ -53,11 +54,12 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
     if (term.length < 2) { setError('Enter at least two characters, a game title, or a full game code.'); setResults([]); setSearched(false); return; }
     request.current?.abort();
     const controller = new AbortController(); request.current = controller;
+    setBrowseMeta(null);
     setLoading(true); setError(''); setWarnings([]); setResults([]); setFailedImages(new Set()); setSearched(true); setVisibleCount(72);
     let timedOut = false;
     const timeoutId = window.setTimeout(() => { timedOut = true; controller.abort(); }, 20_000);
     const platformMatch = MODERN_GAME_PLATFORMS.find(item => item.id === selectedPlatform);
-    const cleanTerm = term.replace(/\b(?:playstation\s*[45]|ps[45]|nintendo\s*switch|switch|xbox\s*one|xbox\s*series(?:\s*x\s*\/\s*s)?|pc)\b/ig, ' ').replace(/\s+/g, ' ').trim() || term;
+    const cleanTerm = term.replace(/\b(?:playstation\s*[45]|ps[45]|nintendo\s*switch(?:\s*2)?|switch(?:\s*2)?|xbox\s*one|xbox\s*series(?:\s*x\s*\/\s*s)?|pc)\b/ig, ' ').replace(/\s+/g, ' ').trim() || term;
     try {
       if (platformMatch) {
         const modern = await searchModernGameIndex(cleanTerm, platformMatch.id, selectedAssets, controller.signal);
@@ -106,10 +108,34 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
     }
   }, [assetFilter]);
 
+  const browsePlatform = useCallback(async (selectedPlatform: string, selectedAssets: GameAssetFilter = assetFilter) => {
+    request.current?.abort();
+    const controller = new AbortController(); request.current = controller;
+    setLoading(true); setError(''); setWarnings([]); setResults([]); setFailedImages(new Set()); setSearched(true); setBrowseMeta(null); setVisibleCount(72);
+    const timeoutId = window.setTimeout(() => controller.abort(), 20_000);
+    try {
+      const result = await browseGamePlatform(selectedPlatform, controller.signal, 36, selectedAssets);
+      if (!controller.signal.aborted) { setBrowseMeta(result); setResults(result.items); }
+    } catch (reason) {
+      if (!controller.signal.aborted) setError(reason instanceof Error ? reason.message : 'This platform index could not be loaded.');
+    } finally {
+      window.clearTimeout(timeoutId);
+      if (request.current === controller) setLoading(false);
+    }
+  }, [assetFilter]);
+
+  const selectPlatform = useCallback((selectedPlatform: string) => {
+    setPlatform(selectedPlatform);
+    if (query.trim().length >= 2) { void runSearch(query, selectedPlatform); return; }
+    if (selectedPlatform === 'all') { request.current?.abort(); setBrowseMeta(null); setResults([]); setSearched(false); setLoading(false); setError(''); return; }
+    void browsePlatform(selectedPlatform);
+  }, [browsePlatform, query, runSearch]);
+
   useEffect(() => {
-    if (initialQuery.trim().length < 2) return;
-    void runSearch(initialQuery, initialPlatform(), assetFilter);
-  }, []); // Opened links with a query can be shared and searched on load.
+    const selectedPlatform = initialPlatform();
+    if (initialQuery.trim().length >= 2) void runSearch(initialQuery, selectedPlatform, assetFilter);
+    else if (selectedPlatform !== 'all') void browsePlatform(selectedPlatform, assetFilter);
+  }, []); // Opened links with a query or platform can be shared and opened directly.
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -122,7 +148,7 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
   }
 
   const toggleFailed = (id: string) => setFailedImages(current => new Set(current).add(id));
-  if(detailGroup)return <GameDetailPage group={detailGroup} favoriteIds={favoriteIds} onBack={()=>setDetailGroup(null)} onOpen={onOpen} onFavorite={onFavorite}/>;
+  if(detailGroup)return <GameDetailPage group={detailGroup} favoriteIds={favoriteIds} onBack={()=>setDetailGroup(null)} onOpen={onOpen} onFavorite={onFavorite} onPlatformBrowse={id=>{setDetailGroup(null);setQuery('');setPlatform(id);void browsePlatform(id);}}/>;
   if(showSources)return <Suspense fallback={<div className="content-width game-source-loading" role="status"><LoaderCircle size={18} className="game-finder-spinner"/> Opening the Games source map…</div>}><GameSourceIndex onOpenGames={(selectedPlatform,term)=>{setShowSources(false);setPlatform(selectedPlatform||'all');if(term){setQuery(term);void runSearch(term,selectedPlatform||'all');}}}/></Suspense>;
   return <section className="content-width search-content game-finder-page" aria-labelledby="game-finder-title">
     <button type="button" className="back-to-collections" onClick={onBack}><ArrowLeft size={16}/> Categories</button>
@@ -134,10 +160,10 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
     <form className="game-finder-search" onSubmit={submit}>
       <label className="game-search-label" htmlFor="game-cover-query">GAME TITLE OR PRODUCT CODE</label>
       <div className="game-query-field"><Search size={21}/><input id="game-cover-query" aria-label="Search game title or code" value={query} onChange={event => setQuery(event.target.value)} placeholder="Start typing · e.g. Final Fantasy X or SLUS-20312" autoComplete="off"/></div>
-      <div className="console-choice"><span className="game-search-label">CHOOSE A CONSOLE · FILTER BY PLATFORM FAMILY</span><GameConsoleSelector options={platforms} value={platform} onChange={setPlatform}/></div>
+      <div className="console-choice"><span className="game-search-label">CHOOSE A CONSOLE · BROWSE BY PLATFORM FAMILY</span><GameConsoleSelector options={platforms} value={platform} onChange={selectPlatform}/></div>
       <div className="game-search-controls"><Button type="submit" disabled={loading}>{loading ? 'Searching…' : 'Search'} <ArrowRight size={16}/></Button></div>
     </form>
-    <div className="game-asset-filters" role="group" aria-label="Game artwork type">{([['covers','Covers'],['screenshots','Gameplay'],['wallpapers','Wallpapers'],['artworks','Publisher art'],['logos','Logos'],['icons','Icons'],['title-screens','Title screens'],['all','All assets']] as [GameAssetFilter,string][]).map(([id,label])=><button type="button" key={id} className={assetFilter===id?'active':''} aria-pressed={assetFilter===id} onClick={()=>{setAssetFilter(id);if(query.trim().length>=2)void runSearch(query,platform,id);}}>{label}</button>)}</div>
+    <div className="game-asset-filters" role="group" aria-label="Game artwork type">{([['covers','Covers'],['screenshots','Gameplay'],['wallpapers','Wallpapers'],['artworks','Publisher art'],['logos','Logos'],['icons','Icons'],['title-screens','Title screens'],['all','All assets']] as [GameAssetFilter,string][]).map(([id,label])=><button type="button" key={id} className={assetFilter===id?'active':''} aria-pressed={assetFilter===id} onClick={()=>{setAssetFilter(id);if(query.trim().length>=2)void runSearch(query,platform,id);else if(browseMeta&&platform!=='all')void browsePlatform(platform,id);}}>{label}</button>)}</div>
     <div className="game-finder-hints">
       <span>Try</span>
       {['Mario GBA', 'Zelda N64', 'Final Fantasy X PS2', 'PCSE00628'].map(example => <button type="button" key={example} onClick={() => { setQuery(example); void runSearch(example, 'all'); }}>{example}</button>)}
@@ -153,11 +179,12 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
     }}/>}
     <div className="game-finder-source"><Info size={15}/><span>Classic and modern platform indexes, trending games, metadata, and image sources live inside this category.</span><button type="button" onClick={()=>setShowSources(true)}>Browse all game sources <ArrowRight size={14}/></button></div>
     {manifestError && <div className="search-warning" role="status"><Info size={16}/><span>Console list unavailable. {manifestError}</span></div>}
+    {browseMeta&&<div className="game-platform-browse-heading"><div><span className="tiny-kicker">{browseMeta.sourceLabel}</span><h2>{browseMeta.items.length ? browseMeta.heading : 'No indexed titles yet'}</h2><p>{browseMeta.items.length ? 'Select a title to open its details and artwork.' : 'This platform index has no current game records. Search by title or browse the platform store.'}</p></div><a href={browseMeta.sourceUrl} target="_blank" rel="noreferrer">Open official catalog <ArrowRight size={14}/></a></div>}
     <div className="results-head" aria-live="polite" aria-atomic="true"><span>{searched ? `${groupedResults.length} GAMES · ${results.length} ${assetFilter==='all'?'ASSETS':assetFilter.toUpperCase().replace('-',' ')}` : 'READY TO SEARCH'}</span><span>{platform === 'all' ? '23 SYSTEMS' : platforms.find(item => item.id === platform)?.label.toUpperCase() || 'CONSOLE INDEX'}</span></div>
     {warnings.length > 0 && <div className="search-warning" role="status" aria-live="polite"><Info size={16}/><span>Some indexes could not be reached: {warnings.join(' · ')}</span></div>}
     {loading && results.length === 0 && <div className="game-finder-empty" role="status"><LoaderCircle size={18} className="game-finder-spinner"/><span>Searching the selected console indexes…</span></div>}
     {!loading && error && <div className="game-finder-empty"><strong>Search needs a little more detail</strong><span>{error}</span></div>}
-    {searched && results.length === 0 && !loading && !error && <div className="game-finder-empty"><Gamepad2 size={24}/><strong>{warnings.length ? 'No matching covers loaded' : 'No matching covers found'}</strong><span>{warnings.length ? 'Try the search again or select one platform to isolate an available index.' : 'Try a shorter title, another platform, or the game’s serial / App ID.'}</span></div>}
+    {searched && results.length === 0 && !loading && !error && <div className="game-finder-empty"><Gamepad2 size={24}/><strong>{browseMeta ? 'No game records in this platform index' : warnings.length ? 'No matching covers loaded' : 'No matching covers found'}</strong><span>{browseMeta ? 'Public metadata coverage varies by platform. Search for a specific game or use the official catalog link above.' : warnings.length ? 'Try the search again or select one platform to isolate an available index.' : 'Try a shorter title, another platform, or the game’s serial / App ID.'}</span></div>}
     {groupedResults.length > 0 && <div className="game-title-groups">
       {groupedResults.slice(0, visibleCount).map(group => {
         const lead = group.editions[0];

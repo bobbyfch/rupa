@@ -422,10 +422,122 @@ export const MODERN_GAME_PLATFORMS = [
   { id: 'ps4', label: 'PlayStation 4', qid: 'Q5014725' },
   { id: 'ps5', label: 'PlayStation 5', qid: 'Q63184502' },
   { id: 'switch', label: 'Nintendo Switch', qid: 'Q19610114' },
+  { id: 'switch2', label: 'Nintendo Switch 2', qid: 'Q122761124' },
   { id: 'xbox-one', label: 'Xbox One', qid: 'Q13361286' },
-  { id: 'xbox-series', label: 'Xbox Series X/S', qid: 'Q98987204' },
+  { id: 'xbox-series', label: 'Xbox Series X/S', qid: 'Q98973368' },
   { id: 'pc', label: 'PC', qid: 'Q388' },
 ] as const;
+
+export type PlatformBrowse = { items: Artwork[]; heading: string; sourceLabel: string; sourceUrl: string; generatedAt?: string };
+type SteamArtworkIndex = { generatedAt?: string; games?: { appId: number; title: string; image?: string; sourceUrl: string; platforms?: string[]; assets?: { id: string; kind: Artwork['kind']; label: string; image: string; preview?: string; sourceUrl?: string; source?: string; provider?: string; platform?: string }[] }[] };
+const GAME_ASSET_KINDS: Record<GameAssetFilter, Artwork['kind'][] | null> = { covers: ['cover'], screenshots: ['screenshot'], wallpapers: ['wallpaper'], artworks: ['promo-art', 'key-art'], logos: ['logo'], icons: ['icon'], 'title-screens': ['title-screen'], all: null };
+async function indexedSteamPlatformArtwork(platform: string, platformLabel: string, assetFilter: GameAssetFilter, signal?: AbortSignal, limit = 36, isPc = false) {
+  const archive = await loadJson<SteamArtworkIndex>('games-steam.json', signal).catch(error => { if (signal?.aborted) throw error; return null; });
+  const items = (archive?.games || []).flatMap(game => {
+    const matches = (game.assets || []).filter(asset => /^https:\/\//.test(asset.image) && (isPc
+      ? game.platforms?.includes('pc') && (!asset.platform || asset.platform === 'PC' || asset.platform === 'All platforms')
+      : asset.platform === platformLabel));
+    if (!matches.length) return [];
+    const selected = assetFilter === 'all' ? matches : matches.filter(asset => GAME_ASSET_KINDS[assetFilter]?.includes(asset.kind));
+    const rows: Artwork[] = [];
+    if ((assetFilter === 'covers' || assetFilter === 'all') && game.image) rows.push({
+      id: `steam:${game.appId}:platform-cover:${platform}`, category: 'games', title: game.title,
+      subtitle: `${platformLabel} · indexed game artwork`, source: 'Steam Store', provider: 'Steam Store API', sourceUrl: game.sourceUrl,
+      imageUrl: game.image, previewUrl: game.image, downloadUrl: game.image, mediaId: String(game.appId), kind: 'cover',
+      rights: 'source-only', editionId: `${platform}:${game.appId}`, availability: 'index-only',
+    });
+    rows.push(...selected.filter(asset => asset.kind !== 'cover').map(asset => ({
+      id: asset.id, category: 'games' as const, title: game.title, subtitle: `${asset.platform || platformLabel} · ${asset.label}`,
+      source: asset.source || 'Game artwork index', provider: asset.provider || 'Game artwork index', sourceUrl: asset.sourceUrl || game.sourceUrl,
+      imageUrl: asset.image, previewUrl: asset.preview || asset.image, downloadUrl: asset.image, mediaId: String(game.appId), kind: asset.kind,
+      rights: 'source-only' as const, editionId: `${platform}:${game.appId}`, availability: 'index-only' as const,
+    })));
+    return rows;
+  }).slice(0, limit);
+  return { items, generatedAt: archive?.generatedAt };
+}
+const PLATFORM_LATEST_URLS: Record<string, string> = {
+  ps4: 'https://store.playstation.com/en-us/pages/latest?platform=ps4',
+  ps5: 'https://store.playstation.com/en-us/pages/latest?platform=ps5',
+  switch: 'https://www.nintendo.com/us/store/games/',
+  switch2: 'https://www.nintendo.com/us/store/games/',
+  'xbox-one': 'https://www.xbox.com/en-US/games',
+  'xbox-series': 'https://www.xbox.com/en-US/games',
+};
+
+/** Browse an indexed platform without asking the visitor to type a title first. */
+export async function browseGamePlatform(platform: string, signal?: AbortSignal, limit = 36, assetFilter: GameAssetFilter = 'covers'): Promise<PlatformBrowse> {
+  if (platform === 'pc' && assetFilter !== 'covers') {
+    const indexed = await indexedSteamPlatformArtwork(platform, 'PC', assetFilter, signal, limit, true);
+    return { items: indexed.items, heading: 'PC game artwork index', sourceLabel: 'Steam Store assets · current archive', sourceUrl: 'https://store.steampowered.com/charts/topselling/', generatedAt: indexed.generatedAt };
+  }
+  if (platform === 'pc') {
+    type TrendSnapshot = { generatedAt?: string; sourceUrl?: string; items?: { rank: number; appId: number; title: string; image: string; sourceUrl: string }[] };
+    const response = await fetch(`${import.meta.env.BASE_URL}data/games-trending.json`, { signal, cache: 'no-cache', headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error('The Steam chart snapshot is unavailable right now.');
+    const snapshot = await response.json() as TrendSnapshot;
+    const items = (snapshot.items || []).slice(0, limit).map(game => ({
+      id: `steam:${game.appId}:cover`, category: 'games' as const, title: game.title, subtitle: `PC · Steam top seller #${game.rank}`,
+      source: 'Steam top sellers', provider: 'Steam Store API', sourceUrl: game.sourceUrl, imageUrl: game.image, previewUrl: game.image,
+      downloadUrl: game.image, mediaId: String(game.appId), kind: 'cover' as const, rights: 'source-only' as const,
+      editionId: `steam:${game.appId}`, availability: 'link-only' as const,
+    }));
+    return { items, heading: 'Steam top sellers', sourceLabel: 'Steam Charts · current snapshot', sourceUrl: snapshot.sourceUrl || 'https://store.steampowered.com/charts/topselling/', generatedAt: snapshot.generatedAt };
+  }
+
+  const modern = MODERN_GAME_PLATFORMS.find(item => item.id === platform);
+  if (modern) {
+    const sourceUrl = PLATFORM_LATEST_URLS[platform] || 'https://www.wikidata.org/wiki/Wikidata:Main_Page';
+    const indexed = await indexedSteamPlatformArtwork(platform, modern.label, assetFilter, signal, limit);
+    if (indexed.items.length) return { items: indexed.items, heading: `${modern.label} artwork index`, sourceLabel: 'Publisher-tagged game assets · current archive', sourceUrl, generatedAt: indexed.generatedAt };
+    const sparql = `SELECT ?game ?gameLabel ?image ?releaseDate WHERE { ?game wdt:P400 wd:${modern.qid}; wdt:P31 wd:Q7889. OPTIONAL { ?game wdt:P18 ?image. } OPTIONAL { ?game wdt:P577 ?releaseDate. } FILTER(!BOUND(?releaseDate) || ?releaseDate <= NOW()) SERVICE wikibase:label { bd:serviceParam wikibase:language "en". } FILTER(!REGEX(STR(?gameLabel), "^Q[0-9]+$")) } ORDER BY DESC(?releaseDate) LIMIT ${Math.min(limit, 48)}`;
+    const params = new URLSearchParams({ query: sparql, format: 'json' });
+    let items: Artwork[] = [];
+    if (assetFilter === 'covers' || assetFilter === 'all') {
+      const queryController = new AbortController();
+      const timeoutId = window.setTimeout(() => queryController.abort(), 7_000);
+      const abortFromParent = () => queryController.abort();
+      signal?.addEventListener('abort', abortFromParent, { once: true });
+      try {
+        const response = await fetch(`https://query.wikidata.org/sparql?${params}`, { signal: queryController.signal, headers: { Accept: 'application/sparql-results+json' } });
+        if (response.ok) {
+          const data = await response.json() as { results?: { bindings?: { game?: { value?: string }; gameLabel?: { value?: string }; image?: { value?: string }; releaseDate?: { value?: string } }[] } };
+          items = (data.results?.bindings || []).flatMap(binding => {
+            const entityUrl = binding.game?.value;
+            const title = binding.gameLabel?.value;
+            if (!entityUrl || !title) return [];
+            const image = binding.image?.value?.replace(/^http:/, 'https:') || '';
+            const mediaId = entityUrl.split('/').pop() || entityUrl;
+            const date = binding.releaseDate?.value?.slice(0, 10);
+            return [{
+              id: `games:wikidata:${mediaId}:cover`, category: 'games' as const, title,
+              subtitle: [modern.label, date?.slice(0, 4), image ? 'Wikimedia image' : 'metadata record'].filter(Boolean).join(' · '),
+              year: date?.slice(0, 4), releaseDate: date, source: 'Wikidata', provider: 'Wikidata', sourceUrl: entityUrl,
+              imageUrl: image, previewUrl: image, downloadUrl: image || undefined, mediaId, kind: 'cover' as const,
+              rights: 'source-only' as const, editionId: `${platform}:${mediaId}`, availability: 'index-only' as const,
+            }];
+          });
+        }
+      } catch (error) {
+        if (signal?.aborted) throw error;
+      } finally {
+        window.clearTimeout(timeoutId);
+        signal?.removeEventListener('abort', abortFromParent);
+      }
+    }
+    return { items, heading: 'Recent platform entries', sourceLabel: 'Wikidata · release dates when listed', sourceUrl, generatedAt: new Date().toISOString() };
+  }
+
+  const manifest = await loadManifest(signal);
+  const shardInfo = manifest.shards.find(shard => shard.kind === 'games' && shard.platform === platform);
+  if (!shardInfo) throw new Error('No game index is configured for this platform yet.');
+  const shard = await loadJson<GameShard>(shardInfo.file, signal);
+  const local = await loadLocalCovers();
+  const titles = shard.rows.filter(([, flags]) => (Number(flags) & 1) !== 0).map(([name]) => name).sort((a, b) => a.localeCompare(b));
+  const items = titles.flatMap(name => gameArtworks(shard, name, 4, local, 'covers').slice(0, 1)).slice(0, limit);
+  return { items, heading: `${shard.label} image index`, sourceLabel: `Indexed covers · ${shard.rows.length.toLocaleString()} titles`, sourceUrl: shard.source.url };
+}
+
 type WikidataGameEntity = { id: string; labels?: { en?: { value?: string } }; descriptions?: { en?: { value?: string } }; claims?: Record<string, { mainsnak?: { datavalue?: { value?: { id?: string; language?: string; text?: string } | string } } }[]> };
 function claimFile(entity: WikidataGameEntity, property: string): string {
   const value = entity.claims?.[property]?.[0]?.mainsnak?.datavalue?.value;
@@ -447,7 +559,8 @@ export async function searchModernGameIndex(query: string, platform = 'all', ass
       pc: ['PC', 'All platforms'],
       ps4: ['PlayStation 4', 'All platforms'],
       ps5: ['PlayStation 5', 'All platforms'],
-      switch: ['Nintendo Switch', 'Nintendo Switch 2', 'All platforms'],
+      switch: ['Nintendo Switch', 'All platforms'],
+      switch2: ['Nintendo Switch 2', 'All platforms'],
       'xbox-one': ['Xbox One', 'Xbox', 'All platforms'],
       'xbox-series': ['Xbox Series X/S', 'Xbox', 'All platforms'],
     };

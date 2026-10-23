@@ -1,5 +1,5 @@
-import { ImageOff } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, ArrowRight, ImageOff } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 export type FilmTimelineEntry = { id: string; title: string; year: number | null; image: string; detail: string };
 
@@ -10,8 +10,38 @@ export function CollectionFilmTimeline({ films, selectedId, onSelect, label, cla
   label: string;
   className?: string;
 }) {
-  return <div className={`collection-film-timeline ${className}`.trim()} aria-label={label}>
-    {films.map(film => <TimelineCard key={film.id} film={film} selected={selectedId === film.id} onSelect={onSelect}/>)}
+  const rail = useRef<HTMLDivElement>(null);
+  const [canScroll, setCanScroll] = useState({ left: false, right: false });
+
+  useEffect(() => {
+    const element = rail.current;
+    if (!element) return;
+    const measure = () => setCanScroll({
+      left: element.scrollLeft > 2,
+      right: element.scrollLeft + element.clientWidth < element.scrollWidth - 2,
+    });
+    measure();
+    element.addEventListener('scroll', measure, { passive: true });
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    if (element.firstElementChild) observer.observe(element.firstElementChild);
+    return () => {
+      element.removeEventListener('scroll', measure);
+      observer.disconnect();
+    };
+  }, [films.length]);
+
+  const move = (direction: -1 | 1) => {
+    const element = rail.current;
+    if (element) element.scrollBy({ left: direction * Math.max(element.clientWidth * .82, 220), behavior: 'smooth' });
+  };
+
+  return <div className="collection-film-timeline-shell" aria-label={label}>
+    <button type="button" className="collection-timeline-arrow" aria-label="Scroll films left" disabled={!canScroll.left} onClick={() => move(-1)}><ArrowLeft size={17}/></button>
+    <div ref={rail} className={`collection-film-timeline ${className}`.trim()} tabIndex={0}>
+      {films.map(film => <TimelineCard key={film.id} film={film} selected={selectedId === film.id} onSelect={onSelect}/>)}
+    </div>
+    <button type="button" className="collection-timeline-arrow" aria-label="Scroll films right" disabled={!canScroll.right} onClick={() => move(1)}><ArrowRight size={17}/></button>
   </div>;
 }
 

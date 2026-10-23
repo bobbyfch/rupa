@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Gamepad2 } from 'lucide-react';
 
 type ConsoleOption = { id: string; label: string };
 type ConsoleInfo = { family: string; era: string };
@@ -9,10 +10,27 @@ const INFO: Record<string, ConsoleInfo> = {
   nds: { family: 'Nintendo', era: '2004 · handheld' }, nes: { family: 'Nintendo', era: '1983 · home' },
   ps1: { family: 'PlayStation', era: '1994 · home' }, ps2: { family: 'PlayStation', era: '2000 · home' }, psp: { family: 'PlayStation', era: '2004 · handheld' },
   psvita: { family: 'PlayStation', era: '2011 · handheld' }, saturn: { family: 'Sega', era: '1994 · home' }, snes: { family: 'Nintendo', era: '1990 · home' },
-  wii: { family: 'Nintendo', era: '2006 · home' }, ps4: { family: 'PlayStation', era: '2013 · home' }, ps5: { family: 'PlayStation', era: '2020 · home' },
+  wii: { family: 'Nintendo', era: '2006 · home' }, ps4: { family: 'PlayStation', era: '2013 · home' }, ps5: { family: 'PlayStation', era: '2020 · home' }, switch2: { family: 'Nintendo', era: '2025 · hybrid' },
   switch: { family: 'Nintendo', era: '2017 · hybrid' }, 'xbox-one': { family: 'Xbox', era: '2013 · home' },
   'xbox-series': { family: 'Xbox', era: '2020 · home' }, pc: { family: 'PC', era: 'multi-generation' },
 };
+
+function platformMark(id: string, family: string) {
+  if (id === 'all') return <Gamepad2 size={16}/>;
+  if (id.startsWith('ps') || family === 'PlayStation') return 'PS';
+  if (id.startsWith('xbox') || family === 'Xbox') return 'X';
+  if (family === 'Nintendo') return 'N';
+  if (id === 'pc') return 'PC';
+  if (family === 'Sega') return 'SG';
+  return '◆';
+}
+
+function platformLogo(id: string, family: string) {
+  const logo = id.startsWith('ps') || family === 'PlayStation' ? ['playstation','003791']
+    : id === 'pc' ? ['steam','171a21']
+    : family === 'Sega' ? ['sega','0081c8'] : null;
+  return logo ? `https://cdn.simpleicons.org/${logo[0]}/${logo[1]}` : '';
+}
 
 export function GameConsoleSelector({ options, value, onChange }: { options: ConsoleOption[]; value: string; onChange: (id: string) => void }) {
   const [family, setFamily] = useState('All families');
@@ -21,10 +39,11 @@ export function GameConsoleSelector({ options, value, onChange }: { options: Con
   return <div className="console-selector">
     <div className="console-family-tabs" role="group" aria-label="Console family">{families.map(name => <button type="button" key={name} className={family === name ? 'active' : ''} aria-pressed={family === name} onClick={() => setFamily(name)}>{name}</button>)}</div>
     <div className="console-rail" role="group" aria-label="Choose a console">
-      <button type="button" className={'console-option console-option-all' + (value === 'all' ? ' active' : '')} aria-pressed={value === 'all'} onClick={() => onChange('all')}><strong>All systems</strong><small>Every indexed console</small></button>
+      <button type="button" className={'console-option console-select console-option-all' + (value === 'all' ? ' active' : '')} aria-pressed={value === 'all'} onClick={() => onChange('all')}><span className="console-platform-mark" data-family="All">{platformMark('all','All')}</span><span className="console-option-copy"><strong>All systems</strong><small>Every indexed console</small></span></button>
       {visible.map(option => {
         const info = INFO[option.id] || { family: 'Other', era: 'catalogued system' };
-        return <button type="button" key={option.id} className={'console-option console-select' + (value === option.id ? ' active' : '')} aria-pressed={value === option.id} onClick={() => onChange(option.id)}><strong>{option.label}</strong><small>{info.family} · {info.era}</small></button>;
+        const logo = platformLogo(option.id, info.family);
+        return <button type="button" key={option.id} className={'console-option console-select' + (value === option.id ? ' active' : '')} aria-pressed={value === option.id} onClick={() => onChange(option.id)}><span className="console-platform-mark" data-family={info.family}>{logo&&<img src={logo} alt="" loading="lazy" onError={event=>{event.currentTarget.style.display='none';}}/>}<span>{platformMark(option.id,info.family)}</span></span><span className="console-option-copy"><strong>{option.label}</strong><small>{info.family} · {info.era}</small></span></button>;
       })}
     </div>
   </div>;

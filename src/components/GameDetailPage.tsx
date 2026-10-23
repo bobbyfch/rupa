@@ -20,6 +20,7 @@ function normalizePlatform(value:string){
   if(/xbox series x and series s|xbox series x\/s/.test(normalized))return 'Xbox Series X/S';
   if(/playstation 5/.test(normalized))return 'PlayStation 5';
   if(/playstation 4/.test(normalized))return 'PlayStation 4';
+  if(/nintendo switch 2/.test(normalized))return 'Nintendo Switch 2';
   if(/nintendo switch/.test(normalized))return 'Nintendo Switch';
   if(normalized==='mac')return 'macOS';
   return value.trim();
@@ -46,7 +47,29 @@ async function steamFacts(appId:string,signal:AbortSignal):Promise<Partial<GameF
   const data=record.data as {short_description?:string;publishers?:string[];developers?:string[];release_date?:{date?:string};platforms?:{windows?:boolean;mac?:boolean;linux?:boolean}};
   return{description:data.short_description,publishers:data.publishers||[],developers:data.developers||[],releaseDate:data.release_date?.date,platforms:Object.entries(data.platforms||{}).filter(([,available])=>available).map(([platform])=>platform==='mac'?'macOS':platform==='linux'?'Linux':'Windows'),steamUrl:`https://store.steampowered.com/app/${appId}/`};
 }
-function GameFacts({group}:{group:GameGroup}){
+function platformIdForFact(value: string) {
+  const name = value.toLocaleLowerCase();
+  if (/playstation\s*5|\bps5\b/.test(name)) return 'ps5';
+  if (/playstation\s*4|\bps4\b/.test(name)) return 'ps4';
+  if (/nintendo\s*switch\s*2/.test(name)) return 'switch2';
+  if (/nintendo\s*switch|\bswitch\b/.test(name)) return 'switch';
+  if (/xbox\s*series/.test(name)) return 'xbox-series';
+  if (/xbox\s*one/.test(name)) return 'xbox-one';
+  if (/\bpc\b|windows/.test(name)) return 'pc';
+  if (/playstation\s*2|\bps2\b/.test(name)) return 'ps2';
+  if (/playstation\s*portable|\bpsp\b/.test(name)) return 'psp';
+  if (/playstation\s*vita|\bvita\b/.test(name)) return 'psvita';
+  if (/\bplaystation\b|\bps1\b/.test(name)) return 'ps1';
+  if (/game\s*boy\s*advance|\bgba\b/.test(name)) return 'gba';
+  if (/game\s*boy\s*color|\bgbc\b/.test(name)) return 'gbc';
+  if (/\bgame\s*boy\b/.test(name)) return 'gb';
+  if (/nintendo\s*64|\bn64\b/.test(name)) return 'n64';
+  if (/gamecube/.test(name)) return 'gc';
+  if (/\bwii\b/.test(name)) return 'wii';
+  return '';
+}
+
+function GameFacts({group,onPlatformBrowse}:{group:GameGroup;onPlatformBrowse:(id:string)=>void}){
   const [facts,setFacts]=useState<GameFacts|null>(null),[loading,setLoading]=useState(true);
   useEffect(()=>{const controller=new AbortController();let active=true;const appId=group.editions.find(item=>item.provider==='Steam Store API'&&item.mediaId)?.mediaId;const timeout=window.setTimeout(()=>controller.abort(),12000);
     const wikidataRequest:Promise<Partial<GameFacts>>=wikidataFacts(group.title,controller.signal).catch(()=>({}));
@@ -63,18 +86,22 @@ function GameFacts({group}:{group:GameGroup}){
       <div><small>RELEASE</small><strong>{year||'Not listed'}</strong></div>
       <div><small>PUBLISHER</small><strong>{facts?.publishers.join(', ')||'Not listed'}</strong></div>
       <div><small>DEVELOPER</small><strong>{facts?.developers.join(', ')||'Not listed'}</strong></div>
-      <div><small>PLATFORMS</small><strong>{facts?.platforms.join(' · ')||group.platforms.join(' · ')||'Not listed'}</strong></div>
+      <div><small>PLATFORMS</small><strong className="game-platform-facts">{(facts?.platforms.length?facts.platforms:group.platforms).length ? (facts?.platforms.length?facts.platforms:group.platforms).map((name,index)=><span key={`${name}-${index}`}>{index>0&&' · '}{platformIdForFact(name)?<button type="button" onClick={()=>onPlatformBrowse(platformIdForFact(name))}>{name}</button>:name}</span>) : 'Not listed'}</strong></div>
     </div>
     <div className="game-facts-sources">Metadata {facts?.steamUrl&&<a href={facts.steamUrl} target="_blank" rel="noreferrer">Steam <ArrowUpRight size={12}/></a>}{facts?.wikidataUrl&&<a href={facts.wikidataUrl} target="_blank" rel="noreferrer">Wikidata <ArrowUpRight size={12}/></a>}{!facts?.steamUrl&&!facts?.wikidataUrl&&<span>Source record unavailable</span>}</div>
   </section>;
 }
-export function GameDetailPage({group,favoriteIds,onBack,onOpen,onFavorite}:{group:GameGroup;favoriteIds:Set<string>;onBack:()=>void;onOpen:(item:Artwork)=>void;onFavorite:(item:Artwork)=>void}){
+export function GameDetailPage({group,favoriteIds,onBack,onOpen,onFavorite,onPlatformBrowse}:{group:GameGroup;favoriteIds:Set<string>;onBack:()=>void;onOpen:(item:Artwork)=>void;onFavorite:(item:Artwork)=>void;onPlatformBrowse:(id:string)=>void}){
   const [filter,setFilter]=useState<GameAssetFilter>('all');
   const [results,setResults]=useState<Artwork[]>(group.editions);
   const [loading,setLoading]=useState(true);
   const [error,setError]=useState('');
   const [attempt,setAttempt]=useState(0);
   const [sourceRegistry,setSourceRegistry]=useState<GameSourceRegistry>({});
+  const [heroBackdrop] = useState(() => {
+    const images = group.editions.map(item => item.previewUrl || item.imageUrl).filter(Boolean);
+    return images.length ? images[Math.floor(Math.random() * images.length)] : '';
+  });
   useEffect(()=>{
     const controller=new AbortController();
     fetch(`${import.meta.env.BASE_URL}data/game-art-sources.json`,{signal:controller.signal,headers:{Accept:'application/json'}})
@@ -105,8 +132,8 @@ export function GameDetailPage({group,favoriteIds,onBack,onOpen,onFavorite}:{gro
   const steamSource=display.find(item=>item.provider==='Steam Store API')?.sourceUrl;
   return <section className="content-width search-content game-detail-page" aria-labelledby="game-detail-title">
     <button type="button" className="back-to-collections" onClick={onBack}><ArrowLeft size={16}/> Back to games</button>
-    <header className="game-detail-header"><div><span className="tiny-kicker">GAME / EDITIONS &amp; ARTWORK</span><h1 id="game-detail-title">{group.title}</h1><p>{group.platforms.join(' · ')} · {display.length} indexed visuals</p></div><div className="game-detail-links">{steamSource&&<a href={steamSource} target="_blank" rel="noreferrer">Steam Store <ArrowUpRight size={13}/></a>}<a href={'https://www.steamgriddb.com/search/grids?term='+encodeURIComponent(group.title)} target="_blank" rel="noreferrer">SteamGridDB <ArrowUpRight size={13}/></a><a href={'https://gamesdb.launchbox-app.com/games/results?id='+encodeURIComponent(group.title)} target="_blank" rel="noreferrer">LaunchBox <ArrowUpRight size={13}/></a></div></header>
-    <GameFacts group={group}/>
+    <header className="game-detail-header"><div className="game-detail-backdrop" aria-hidden="true">{heroBackdrop&&<img src={heroBackdrop} alt="" loading="lazy" decoding="async"/>}</div><div><span className="tiny-kicker">GAME / EDITIONS &amp; ARTWORK</span><h1 id="game-detail-title">{group.title}</h1><p>{group.platforms.join(' · ')} · {display.length} indexed visuals</p></div><div className="game-detail-links">{steamSource&&<a href={steamSource} target="_blank" rel="noreferrer">Steam Store <ArrowUpRight size={13}/></a>}<a href={'https://www.steamgriddb.com/search/grids?term='+encodeURIComponent(group.title)} target="_blank" rel="noreferrer">SteamGridDB <ArrowUpRight size={13}/></a><a href={'https://gamesdb.launchbox-app.com/games/results?id='+encodeURIComponent(group.title)} target="_blank" rel="noreferrer">LaunchBox <ArrowUpRight size={13}/></a></div></header>
+    <GameFacts group={group} onPlatformBrowse={onPlatformBrowse}/>
     {curatedSources.length>0&&<nav className="game-source-band" aria-label="Additional publisher sources"><span>PUBLISHER SOURCES</span><div>{curatedSources.map(source=><a key={source.url} href={source.url} target="_blank" rel="noreferrer">{source.label}<small>{source.kind||'Image archive'}</small><ArrowUpRight size={13}/></a>)}</div></nav>}
     {communitySearches.length>0&&<nav className="game-source-band" aria-label={`Other image catalogs for ${group.title}`}><span>SEARCH OTHER CATALOGS</span><div>{communitySearches.map(source=><a key={source.id} href={source.urlTemplate!.replace('{query}',encodeURIComponent(group.title))} target="_blank" rel="noreferrer">{source.name}<small>External title search</small><ArrowUpRight size={13}/></a>)}</div></nav>}
     <div className="game-asset-filters" role="group" aria-label="Game artwork type">{FILTERS.map(([id,label])=><button type="button" key={id} className={filter===id?'active':''} aria-pressed={filter===id} onClick={()=>setFilter(id)}>{label}</button>)}</div>
