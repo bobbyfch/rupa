@@ -11,7 +11,7 @@ export const LIMITS = { maxFileBytes: 10_000_000, maxOfflineBytes: 230_000_000, 
 // Provider credentials are not allowed in offline ingest or public config. SteamGridDB is the
 // documented exception for live Worker search; its secret is checked separately below.
 const KEY_PATTERN = /\b(TMDB_[A-Z_]*|IGDB_[A-Z_]*|TWITCH_CLIENT_[A-Z]+|YOUTUBE_API_KEY|FANART_[A-Z_]*|TVDB_[A-Z_]*|DISCOGS_[A-Z_]*|LASTFM_[A-Z_]*|COMICVINE_[A-Z_]*|RAWG_[A-Z_]*|SCREENSCRAPER_[A-Z_]*|GOOGLE_BOOKS_API_KEY|APPLE_MUSIC_DEVELOPER_TOKEN)\b/;
-const STEAMGRIDDB_KEY_PATTERN = /\bSTEAMGRIDDB_[A-Z_]*\b/;
+const STEAMGRIDDB_KEY_PATTERN = /\bSTEAMGRIDDB_[A-Z_]*\b/g;
 
 async function walk(dir) {
   const out = [];
