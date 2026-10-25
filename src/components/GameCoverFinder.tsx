@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, ChevronDown, Database, Gamepad2, Info, LoaderCir
 import type { Artwork } from '../lib/types';
 import { browseGamePlatform, groupGameArtworks, loadManifest, normalizeText, searchGameIndex, searchModernGameIndex, MODERN_GAME_PLATFORMS } from '../lib/catalog';
 import type { GameAssetFilter, IndexManifest, PlatformBrowse } from '../lib/catalog';
-import { hasBackend, searchArtwork } from '../lib/providers';
+import { hasSearchBackend, searchArtwork } from '../lib/providers';
 import { Button } from './ui/button';
 import { GameConsoleSelector } from './GameConsoleSelector';
 import { GameDetailPage } from './GameDetailPage';
@@ -76,7 +76,7 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
   const classicRecordCount = gameShards.reduce((total, shard) => total + shard.rows, 0);
   const groupedResults = useMemo(() => groupGameArtworks(results), [results]);
   const searchSteamGridDb = useCallback(async (term: string, assetFilter: GameAssetFilter, signal: AbortSignal) => {
-    if (!hasBackend) return [] as Artwork[];
+    if (!hasSearchBackend) return [] as Artwork[];
     const outcome = await searchArtwork(term, 'games', signal, undefined, 'id', 'steamgriddb', assetFilter);
     if (!signal.aborted && outcome.warnings.length) {
       setWarnings(current => [...new Set([...current, ...outcome.warnings])]);
@@ -126,7 +126,7 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
           onWarning: message => { if (!controller.signal.aborted) setWarnings(current => current.includes(message) ? current : [...current, message]); },
         });
         const modernSearch = searchModernGameIndex(cleanTerm, 'all', selectedAssets, controller.signal);
-        const steamSearch = hasBackend ? searchSteamGridDb(cleanTerm, selectedAssets, controller.signal).then(items => { steamResults = items; publishCombined(); return items; }) : Promise.resolve([] as Artwork[]);
+        const steamSearch = hasSearchBackend ? searchSteamGridDb(cleanTerm, selectedAssets, controller.signal).then(items => { steamResults = items; publishCombined(); return items; }) : Promise.resolve([] as Artwork[]);
         const [classicOutcome, modernOutcome, steamOutcome] = await Promise.allSettled([classicSearch, modernSearch, steamSearch]);
         if (controller.signal.aborted) return [];
         if (classicOutcome.status === 'fulfilled') classicResults = classicOutcome.value;

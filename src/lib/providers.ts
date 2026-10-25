@@ -9,6 +9,7 @@ const API_REQUEST_TIMEOUT_MS=15_000;
 const MANGA_DETAIL_REQUEST_TIMEOUT_MS=28_000;
 const APPLE_SEARCH_TIMEOUT_MS=10_000;
 export const hasBackend = Boolean(backend);
+export const hasSearchBackend = Boolean(searchBackend);
 export const apiUrl = (path:string) => `${backend}${path}`;
 async function aniListMangaAliases(mediaId:string,signal:AbortSignal):Promise<string[]>{
  if(!/^\d+$/.test(mediaId))return [];

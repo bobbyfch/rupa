@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowUpRight, Gamepad2, Heart, LoaderCircle } from 'lucide-react';
 import type { Artwork } from '../lib/types';
 import { groupGameArtworks, normalizeText, searchGameIndex, searchModernGameIndex, type GameAssetFilter } from '../lib/catalog';
-import { hasBackend, searchArtwork } from '../lib/providers';
+import { hasSearchBackend, searchArtwork } from '../lib/providers';
 
 type GameGroup = ReturnType<typeof groupGameArtworks>[number];
 const FILTERS:[GameAssetFilter,string][]=[['covers','Covers'],['screenshots','Gameplay'],['wallpapers','Wallpapers'],['artworks','Publisher art'],['logos','Logos'],['icons','Icons'],['title-screens','Title screens'],['all','All assets']];
@@ -116,7 +116,7 @@ export function GameDetailPage({group,favoriteIds,onBack,onOpen,onFavorite,onPla
     const timeout=window.setTimeout(()=>{timedOut=true;controller.abort();},20_000);
     setLoading(true);
     const modernOnly=group.platforms.some(platform=>/playstation 4|playstation 5|nintendo switch|xbox one|xbox series|\bpc\b/i.test(platform));
-    const steamGridDbSearch=hasBackend&&!['screenshots','title-screens'].includes(filter)
+    const steamGridDbSearch=hasSearchBackend&&!['screenshots','title-screens'].includes(filter)
       ?searchArtwork(group.title,'games',controller.signal,undefined,'id','steamgriddb',filter).then(outcome=>outcome.results).catch(error=>{if(controller.signal.aborted)throw error;return [] as Artwork[];})
       :Promise.resolve([] as Artwork[]);
     void Promise.all([
