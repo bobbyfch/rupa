@@ -14,8 +14,8 @@ Rupa is a static, browser-based media and artwork downloader. Apple tools are gr
 ## Other catalogs
 
 - Anime and manga search use AniList and Jikan from the browser.
-- YouTube links can show a thumbnail using YouTube's oEmbed endpoint. This does not extract or download YouTube video files.
-- Additional platforms such as Instagram require a compatible download service. A static GitHub Pages site cannot bypass platform restrictions or host a server-side extractor.
+- YouTube links can show and download thumbnails using YouTube's oEmbed endpoint. This does not extract or download YouTube video files.
+- Instagram is listed as a planned tool. Instagram and full YouTube downloads require a compatible media service; a static GitHub Pages site cannot bypass platform restrictions or host a server-side extractor.
 
 Rupa has no custom scraping service or Rupa download API. Catalog searches and motion artwork lookups call public third-party endpoints directly from the browser; media files are downloaded to the user's device. The direct URL tool depends on the host's CORS policy.
 
