@@ -1,58 +1,29 @@
 # Rupa
 
-**A visual archive for the things we love.**
+Rupa is a browser-based media downloader. Its first active tools are Apple Music artwork and direct media file URLs.
 
-Rupa is a contemporary image discovery catalogue for film, music, books, games, apps, and illustrated stories. Search by category, browse charts and curated collections, then follow each image back to its source.
+## What works
 
-[Open Rupa](https://bobbyfch.github.io/rupa/) · [Sources and providers](docs/SOURCES.md) · [Attribution](docs/ATTRIBUTIONS.md) · [Rights notes](docs/RIGHTS_AND_ATTRIBUTION.md)
+- Search Apple Music album artwork by album, artist, or Apple Music link, then download the image in its original format or export PNG, JPEG, or WebP.
+- Paste an Apple-hosted artwork image URL to download it directly.
+- Download a direct HTTPS image, audio, video, or file URL when its host allows browser cross-origin access (CORS). Direct downloads are capped at 100 MB.
+- Files are fetched and saved by the browser. Rupa does not host uploaded media or run its own download API.
 
-## Explore
+Apple catalog search uses Apple's public iTunes Search/Lookup endpoint from the browser. It does not scrape Apple Music pages. Apple artwork files are fetched from Apple's image CDN when the user downloads them.
 
-- **Categories** — search Apple catalogs and connected services for music, music videos, film, television, books, audiobooks, podcasts, apps, anime, manga, comics, games, and more.
-- **Charts and discovery** — open current Apple and public-provider charts where available, or use category-specific trend and latest feeds.
-- **Games** — find a title across classic and modern consoles, then browse editions, covers, gameplay images, wallpapers, logos, icons, and publisher art on one detail page.
-- **Curated collections** — explore Studio Ghibli and Makoto Shinkai film timelines, posters, and sourced stills.
-- **Your archive** — save image references, organize them in local profiles, compare artwork, and export a personal backup.
+## Platform limits
 
-Search availability depends on the upstream catalog and its region. A source can return no matches while another has the same title; use **All sources** when a source-specific search is empty. Rupa links to source-hosted images and keeps credit and context close to each result. Some explicitly documented open-license assets are bundled for offline browsing; see the rights notes before reusing any image.
+GitHub Pages hosts static HTML, CSS, and JavaScript only. It can host Rupa's interface and the browser-side Apple/direct-file tools. A YouTube or Instagram page URL is not a direct media URL; extracting those media files needs a separate server-side service. Those platform tools remain unavailable until that service is deployed.
 
-## Data and image sources
+The direct URL tool also depends on the media host's CORS policy. If the host blocks browser access, GitHub Pages cannot proxy around that restriction.
 
-Rupa combines live catalog APIs, public metadata indexes, and curated collection manifests. It does not host or provide media streams. Most third-party image previews load from their source; explicitly documented open-license images are bundled for offline browsing. Favorites and profiles stay in the browser unless the optional encrypted sync service is configured.
-
-| Area | Example sources | Details |
-| --- | --- | --- |
-| Apple catalogs | Apple Music, Books, Podcasts, App Store, iTunes | Search and chart feeds vary by category and storefront. |
-| Film, television, and anime | Cinemeta, Wikidata, Wikimedia Commons, AniList, Jikan | Metadata and artwork availability differ by title. |
-| Manga and comics | MangaDex, Open Library, AniList, Jikan, public metadata catalogs | Series detail groups available editions and numbered volume covers when a provider exposes them. |
-| Games | Steam, Wikidata, Wikimedia Commons, console indexes, publisher pages | The detail page merges records and keeps the original source links. |
-| Curated films | Studio Ghibli and Makoto Shinkai official archives and credited pages | Each collection lists its source and context. |
-
-See [docs/SOURCES.md](docs/SOURCES.md), [docs/ATTRIBUTIONS.md](docs/ATTRIBUTIONS.md), and [docs/RIGHTS_AND_ATTRIBUTION.md](docs/RIGHTS_AND_ATTRIBUTION.md) for provider coverage and image-use notes.
-
-## Run locally
-
-**Requirements:** Node.js 22 or later.
+## Development
 
 ```sh
-npm install
+npm ci
 npm run dev
-```
-
-Rupa keeps its frontend on GitHub Pages and can use the Vercel Function in `api/search.js` for live provider search. Set `VITE_SEARCH_API_URL` to the Vercel deployment's base URL in the Pages workflow or repository variable. SteamGridDB is scraped from its public HTML search pages; no SteamGridDB key is used. `VITE_API_URL` remains separate for optional image tools and encrypted sync. Keep provider secrets out of all `VITE_*` values.
-
-## Useful commands
-
-```sh
-npm run typecheck
-npm test
 npm run build
-npm run refresh:apple-trends
-npm run refresh:game-trends
+npm run preview
 ```
 
-The site is published to GitHub Pages by [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml). Feed refreshes run through their own workflows; local refresh commands are available for maintainers.
-
-## Built with
-
-React, TypeScript, Vite, Dexie/IndexedDB, and an optional Vercel Function.
+The `main` branch deploys to GitHub Pages through `.github/workflows/deploy-pages.yml`.
