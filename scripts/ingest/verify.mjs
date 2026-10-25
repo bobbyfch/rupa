@@ -1,4 +1,4 @@
-// Offline data gates used by CI and tests: asset integrity, rights ledger, no provider keys, budgets.
+// Offline data gates used by CI and tests: asset integrity, rights ledger, no ingest keys, budgets.
 // Usage: node scripts/ingest/verify.mjs      (exit 1 on any error)
 import { createHash } from 'node:crypto';
 import { readdir, readFile, stat } from 'node:fs/promises';
@@ -8,8 +8,10 @@ import { imageInfo } from '../lib/imageinfo.mjs';
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const read = async file => JSON.parse(await readFile(path.join(ROOT, file), 'utf8'));
 export const LIMITS = { maxFileBytes: 10_000_000, maxOfflineBytes: 230_000_000, minMirrorLongEdge: 1200 };
-// Names of credentials belonging to providers dropped by the keyless policy (docs/RUPA_ARTWORK_APIS.md section C.1).
-const KEY_PATTERN = /\b(TMDB_[A-Z_]*|IGDB_[A-Z_]*|TWITCH_CLIENT_[A-Z]+|YOUTUBE_API_KEY|STEAMGRIDDB_[A-Z_]*|FANART_[A-Z_]*|TVDB_[A-Z_]*|DISCOGS_[A-Z_]*|LASTFM_[A-Z_]*|COMICVINE_[A-Z_]*|RAWG_[A-Z_]*|SCREENSCRAPER_[A-Z_]*|GOOGLE_BOOKS_API_KEY|APPLE_MUSIC_DEVELOPER_TOKEN)\b/;
+// Provider credentials are not allowed in offline ingest or public config. SteamGridDB is the
+// documented exception for live Worker search; its secret is checked separately below.
+const KEY_PATTERN = /\b(TMDB_[A-Z_]*|IGDB_[A-Z_]*|TWITCH_CLIENT_[A-Z]+|YOUTUBE_API_KEY|FANART_[A-Z_]*|TVDB_[A-Z_]*|DISCOGS_[A-Z_]*|LASTFM_[A-Z_]*|COMICVINE_[A-Z_]*|RAWG_[A-Z_]*|SCREENSCRAPER_[A-Z_]*|GOOGLE_BOOKS_API_KEY|APPLE_MUSIC_DEVELOPER_TOKEN)\b/;
+const STEAMGRIDDB_KEY_PATTERN = /\bSTEAMGRIDDB_[A-Z_]*\b/;
 
 async function walk(dir) {
   const out = [];
@@ -58,9 +60,12 @@ export async function verifyRights() {
   const errors = [];
   const registry = await read('data/registry/sources.json'), ledger = await read('data/provenance/rights-ledger.json');
   for (const source of registry.sources) {
-    if (source.role !== 'rejected' && source.requiresProviderApiKey !== false) errors.push(`registry: ${source.id} is active but requiresProviderApiKey != false`);
+    const documentedWorkerProvider = source.id === 'steamgriddb' && source.role === 'reference'
+      && source.requiresProviderApiKey === true && source.upstream === 'https://www.steamgriddb.com/api/v2'
+      && source.imageMode === 'remote-reference';
+    if (source.role !== 'rejected' && source.requiresProviderApiKey !== false && !documentedWorkerProvider) errors.push(`registry: ${source.id} is active but requiresProviderApiKey != false`);
     if (source.role === 'rejected' && source.requiresProviderApiKey !== true) errors.push(`registry: rejected ${source.id} should record why (requiresProviderApiKey)`);
-    if (source.implemented === true && source.status === 'candidate') errors.push(`registry: ${source.id} is implemented but still marked candidate`);
+    if (source.implemented === true && source.status === 'candidate' && !documentedWorkerProvider) errors.push(`registry: ${source.id} is implemented but still marked candidate`);
   }
   for (const entry of ledger.entries) {
     if (entry.mirrored) {
@@ -82,7 +87,7 @@ export async function verifyRights() {
       if (parsed.protocol !== 'https:' || /^(localhost|127\.|10\.|192\.168\.|169\.254\.)/.test(parsed.hostname)) errors.push(`${file}: unsafe imageBase ${url}`);
     }
   }
-  // No provider key may be read by the worker, configs or the browser bundle sources.
+  // Keep provider keys out of offline/config/browser files. SteamGridDB may be read only from the Worker runtime env.
   for (const rel of ['worker/src', 'worker/wrangler.toml', '.env.example', 'src', '.github/workflows']) {
     const target = path.join(ROOT, rel);
     const files = (await stat(target)).isDirectory() ? (await walk(target)).filter(file => /\.(js|ts|tsx|toml|yml|yaml|json|d\.ts)$/.test(file)) : [target];
@@ -90,6 +95,12 @@ export async function verifyRights() {
       const text = await readFile(file, 'utf8');
       const hit = text.match(KEY_PATTERN);
       if (hit) errors.push(`${path.relative(ROOT, file)}: references provider credential ${hit[0]}`);
+      for (const match of text.matchAll(STEAMGRIDDB_KEY_PATTERN)) {
+        const isWorkerEnvBinding = match[0] === 'STEAMGRIDDB_API_KEY'
+          && path.relative(ROOT, file) === 'worker/src/search.js'
+          && text.includes('env?.STEAMGRIDDB_API_KEY');
+        if (!isWorkerEnvBinding) errors.push(`${path.relative(ROOT, file)}: references provider credential ${match[0]}`);
+      }
     }
   }
   return { errors, entries: ledger.entries.length };

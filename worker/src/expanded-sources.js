@@ -359,8 +359,8 @@ export async function mangaDexSeriesDetail({id='',title='',signal}={}){
   return result;
 }
 
-const STEAMGRIDDB_API='https://www.steamgriddb.com/api/v2';
-const STEAMGRIDDB_ASSETS={
+const SGDB_BASE_URL='https://www.steamgriddb.com/api/v2';
+const SGDB_ASSETS={
   grids:{kind:'cover',label:'Grid',route:'grid'},
   heroes:{kind:'wallpaper',label:'Hero',route:'hero'},
   logos:{kind:'logo',label:'Logo',route:'logo'},
@@ -368,7 +368,7 @@ const STEAMGRIDDB_ASSETS={
 };
 const steamGridDbFilterTypes={
   covers:['grids'],screenshots:[],wallpapers:['heroes'],artworks:['heroes'],
-  logos:['logos'],icons:['icons'],'title-screens':[],all:Object.keys(STEAMGRIDDB_ASSETS),
+  logos:['logos'],icons:['icons'],'title-screens':[],all:Object.keys(SGDB_ASSETS),
 };
 const normalizeGameName=value=>string(value,180).toLocaleLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 function steamGridDbImage(value){
@@ -382,10 +382,10 @@ function steamGridDbImage(value){
 export async function steamGridDbArtworks(query,limit,apiKey,signal,assetFilter='covers') {
   const term=string(query,90),key=string(apiKey,300);
   if(term.length<2)return [];
-  if(!key)throw new Error('SteamGridDB requires a configured Worker secret: STEAMGRIDDB_API_KEY.');
+  if(!key)throw new Error('SteamGridDB requires a configured Worker secret.');
   const types=steamGridDbFilterTypes[assetFilter]||steamGridDbFilterTypes.covers;
   if(!types.length)return [];
-  const search=await api(`${STEAMGRIDDB_API}/search/autocomplete/${encodeURIComponent(term)}`,{
+  const search=await api(`${SGDB_BASE_URL}/search/autocomplete/${encodeURIComponent(term)}`,{
     headers:{Authorization:`Bearer ${key}`},
   },signal);
   if(search?.success!==true||!Array.isArray(search.data))throw new Error('SteamGridDB returned an invalid title search response.');
@@ -398,8 +398,8 @@ export async function steamGridDbArtworks(query,limit,apiKey,signal,assetFilter=
     .sort((a,b)=>a.rank-b.rank||a.index-b.index).slice(0,3);
   if(!games.length)return [];
   const settled=await Promise.allSettled(games.flatMap(game=>types.map(async type=>{
-    const endpoint=STEAMGRIDDB_ASSETS[type];
-    const payload=await api(`${STEAMGRIDDB_API}/${type}/game/${game.id}`,{
+    const endpoint=SGDB_ASSETS[type];
+    const payload=await api(`${SGDB_BASE_URL}/${type}/game/${game.id}`,{
       headers:{Authorization:`Bearer ${key}`},
     },signal);
     if(payload?.success!==true||!Array.isArray(payload.data))throw new Error('SteamGridDB returned an invalid artwork response.');

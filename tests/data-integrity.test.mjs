@@ -9,7 +9,7 @@ test('mirrored assets match their hashes, dimensions, budgets and ledger rows', 
   assert.ok(assets >= 16);
 });
 
-test('rights ledger, source registry and index shards obey the keyless, reference-only policy', async () => {
+test('offline rights data stays reference-only and approved Worker secrets stay server-side', async () => {
   const { errors } = await verifyRights();
   assert.deepEqual(errors, []);
 });
