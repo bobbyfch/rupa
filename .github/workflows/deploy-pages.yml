@@ -3,6 +3,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      worker_url:
+        description: "Cloudflare Worker base URL (optional if VITE_API_URL is already set)"
+        required: false
+        type: string
 permissions:
   contents: read
   pages: write
@@ -23,7 +28,7 @@ jobs:
         continue-on-error: true
       - run: npm run build
         env:
-          VITE_API_URL: ${{ vars.VITE_API_URL }}
+          VITE_API_URL: ${{ inputs.worker_url || vars.VITE_API_URL }}
           GITHUB_REPOSITORY: ${{ github.repository }}
       - uses: actions/upload-pages-artifact@v3
         with: { path: dist }
