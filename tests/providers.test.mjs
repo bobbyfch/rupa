@@ -512,14 +512,14 @@ test('Music album search falls back to album art returned for an exact song titl
   }finally{globalThis.fetch=original;}
 });
 
-test('multi-source categories explain that the Worker is required when it is not configured',async()=>{
+test('multi-source categories explain that the live search backend is required when it is not configured',async()=>{
   const original=globalThis.fetch;let calls=0;
-  globalThis.fetch=async()=>{calls++;throw new Error('Worker-backed search must stay disabled without a Worker URL');};
+  globalThis.fetch=async()=>{calls++;throw new Error('Search-backend requests must stay disabled without a search URL');};
   try{
     for(const category of ['all']){
       const response=await searchArtwork('not open unique '+category,category);
       assert.deepEqual(response.results,[]);
-      assert.match(response.warnings[0],/RUPA Worker/);
+      assert.match(response.warnings[0],/live search backend/);
     }
     assert.equal(calls,0);
   }finally{globalThis.fetch=original;}
