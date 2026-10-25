@@ -46,7 +46,7 @@
       "name": "SteamGridDB",
       "group": "Community catalogs",
       "description": "Public-page search for grids, heroes, logos, and icons. Previews stay on SteamGridDB-hosted image URLs; Rupa does not copy the image files or infer reuse rights.",
-      "mode": "Worker public-page scrape; remote image references",
+      "mode": "Vercel Function public-page scrape; remote image references",
       "urlTemplate": "https://www.steamgriddb.com/search/grids?term={query}",
       "assets": ["Grids", "Heroes", "Logos", "Icons"],
       "requiresProviderApiKey": false,

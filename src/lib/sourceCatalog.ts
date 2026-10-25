@@ -41,7 +41,7 @@ const sourceOptions: Partial<Record<Category, SourceOption[]>> = {
   ],
   anime: [
     { id: 'all', label: 'Best available' },
-    { id: 'local-index', label: 'Offline title index', note: 'Works without the Worker' },
+    { id: 'local-index', label: 'Offline title index', note: 'Works offline' },
     { id: 'jikan', label: 'Jikan / MyAnimeList' },
     { id: 'anilist', label: 'AniList' },
   ],
@@ -57,10 +57,10 @@ const sourceOptions: Partial<Record<Category, SourceOption[]>> = {
   ],
   games: [
     { id: 'all', label: 'All sources' },
-    { id: 'local-index', label: 'Offline title index', note: '17 platforms, no Worker' },
+    { id: 'local-index', label: 'Offline title index', note: '17 platforms, offline' },
     { id: 'retro', label: 'PS1 / PS2 / Libretro' },
     { id: 'vitahex', label: 'HexFlow · PS Vita', note: 'Exact title index / App ID' },
-    { id: 'steamgriddb', label: 'SteamGridDB · PC artwork', note: 'Live public-page scrape through the Worker' },
+    { id: 'steamgriddb', label: 'SteamGridDB · PC artwork', note: 'Live public-page scrape through the search backend' },
   ],
   videos: [
     { id: 'all', label: 'YouTube thumbnails' },

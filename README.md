@@ -39,9 +39,7 @@ npm install
 npm run dev
 ```
 
-The optional Cloudflare Worker adds same-origin image processing, expanded provider search, and encrypted cross-device sync. Set `VITE_API_URL` to its base URL to use it. Keep provider secrets in Worker environment variables; never expose secrets in client-side `VITE_*` variables.
-
-SteamGridDB game artwork search scrapes its public search pages through the Worker, so no SteamGridDB provider key is needed. SteamGridDB previews remain remote references and do not grant reuse rights.
+Rupa keeps its frontend on GitHub Pages and can use the Vercel Function in `api/search.js` for live provider search. Set `VITE_SEARCH_API_URL` to the Vercel deployment's base URL in the Pages workflow or repository variable. SteamGridDB is scraped from its public HTML search pages; no SteamGridDB key is used. `VITE_API_URL` remains separate for optional image tools and encrypted sync. Keep provider secrets out of all `VITE_*` values.
 
 ## Useful commands
 
@@ -57,4 +55,4 @@ The site is published to GitHub Pages by [`.github/workflows/deploy-pages.yml`](
 
 ## Built with
 
-React, TypeScript, Vite, Dexie/IndexedDB, and an optional Cloudflare Worker.
+React, TypeScript, Vite, Dexie/IndexedDB, and an optional Vercel Function.

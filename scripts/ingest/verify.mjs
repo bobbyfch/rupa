@@ -82,8 +82,8 @@ export async function verifyRights() {
       if (parsed.protocol !== 'https:' || /^(localhost|127\.|10\.|192\.168\.|169\.254\.)/.test(parsed.hostname)) errors.push(`${file}: unsafe imageBase ${url}`);
     }
   }
-  // Keep provider keys out of offline/config/browser files and Worker source.
-  for (const rel of ['worker/src', 'worker/wrangler.toml', '.env.example', 'src', '.github/workflows']) {
+  // Keep provider keys out of offline/config/browser files and server source.
+  for (const rel of ['api', 'worker/src', 'worker/wrangler.toml', '.env.example', 'src', '.github/workflows']) {
     const target = path.join(ROOT, rel);
     const files = (await stat(target)).isDirectory() ? (await walk(target)).filter(file => /\.(js|ts|tsx|toml|yml|yaml|json|d\.ts)$/.test(file)) : [target];
     for (const file of files) {

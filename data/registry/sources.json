@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "policy": "Offline ingest does not use third-party API keys, premium accounts, or anti-bot bypasses. Optional provider keys are allowed only for documented live search through server-side Worker secrets; image rights are never inferred. Status values are filled from data/checks/source-health.json after a live probe; anything not probed stays 'candidate'.",
+  "policy": "Offline ingest does not use third-party API keys, premium accounts, or anti-bot bypasses. Optional provider keys are allowed only for documented live search through server-side environment variables; image rights are never inferred. Status values are filled from data/checks/source-health.json after a live probe; anything not probed stays 'candidate'.",
   "rightsStatuses": [
     "cc0",
     "public-domain",
@@ -494,7 +494,7 @@
       "requiresProviderApiKey": false,
       "upstream": "https://api.deezer.com/search/album",
       "rightsMode": "reference-only",
-      "imageMode": "remote (Worker needed for CORS)",
+      "imageMode": "remote (search backend needed for CORS)",
       "probe": {
         "url": "https://api.deezer.com/search/album?q=meteora&limit=1",
         "expect": "json"
@@ -689,7 +689,7 @@
       "upstream": "https://www.steamgriddb.com",
       "rightsMode": "source-linked reference art; no rights inferred",
       "imageMode": "remote-reference",
-      "notes": "The Worker searches public SteamGridDB HTML pages and references source-hosted images; no SteamGridDB provider key is used."
+      "notes": "The Vercel Function searches public SteamGridDB HTML pages and references source-hosted images; no SteamGridDB provider key is used."
     },
     {
       "id": "fanart-tv",

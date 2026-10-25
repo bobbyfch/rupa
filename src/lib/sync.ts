@@ -9,14 +9,14 @@ async function call(url:string,opts:RequestInit){
   return res.json();
 }
 export async function createSync(profile:LocalProfile){
-  if(!hasBackend)throw new Error('Deploy a Cloudflare Worker and set VITE_API_URL first');
+  if(!hasBackend)throw new Error('Configure the encrypted sync backend and set VITE_API_URL first');
   const chain=newChain(),code=encodeChain(chain),creds=await credentials(chain);
   const snapshot=await getSnapshot(profile),payload=await encryptJson(chain.master,snapshot);
   await call('/sync/chains',{method:'POST',headers:{'Content-Type':'application/json','Authorization':`Bearer ${creds.token}`},body:JSON.stringify({id:chain.id,payload})});
   await db.profiles.update(profile.id,{syncCode:code});return code;
 }
 export async function syncProfile(profile:LocalProfile,code=profile.syncCode){
-  if(!hasBackend)throw new Error('Cloudflare Worker not configured');
+  if(!hasBackend)throw new Error('Encrypted sync backend not configured');
   if(!code)throw new Error('No sync chain');
   const chain=parseChain(code),creds=await credentials(chain);
   const headers={'Content-Type':'application/json','Authorization':`Bearer ${creds.token}`};

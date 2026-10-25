@@ -4,6 +4,7 @@ import appleChartFeeds from './appleChartFeeds.json' with { type: 'json' };
 import { artworkMatches, hasTitleIndex, searchAnimeIndex, searchGameIndex, searchTitleArtworks } from './catalog.ts';
 import { fetchOpenLibraryMangaSeries, mergeMangaSeriesDetails } from './mangaCatalog.ts';
 const backend = (import.meta.env?.VITE_API_URL || '').replace(/\/$/, '');
+const searchBackend = (import.meta.env?.VITE_SEARCH_API_URL || '').replace(/\/$/, '');
 const API_REQUEST_TIMEOUT_MS=15_000;
 const MANGA_DETAIL_REQUEST_TIMEOUT_MS=28_000;
 const APPLE_SEARCH_TIMEOUT_MS=10_000;
@@ -53,8 +54,8 @@ export async function getMangaSeriesDetail(title:string,id:string|undefined,sign
   workerError=error;
  }
 
- // GitHub Pages has no Worker runtime of its own. Keep manga volume lookup usable there
- // by querying Open Library directly when the optional Worker route is missing, unavailable,
+ // GitHub Pages has no server-side runtime. Keep manga volume lookup usable there
+ // by querying Open Library directly when the optional search route is missing, unavailable,
  // or has no numbered cover records for this series.
  try{
   const fallback=await openLibraryMangaTitles(title,[...aliases],signal);
@@ -347,7 +348,7 @@ async function music(q:string,country:AppleStorefront,signal?:AbortSignal):Promi
   return discography.length?discography:results;
 }
 export async function searchMusicArtists(q:string,signal?:AbortSignal,country:AppleStorefront='id'):Promise<Artwork[]> {
-  if(!backend)throw new Error('Artist image search needs the RUPA Worker configured in VITE_API_URL.');
+  if(!backend)throw new Error('Artist image search needs a RUPA API backend configured in VITE_API_URL.');
   const value=q.trim();
   let artists:any[]=[];
   if(/^https?:\/\//i.test(value)){
@@ -557,7 +558,7 @@ function dedupeArtwork(items:Artwork[]):Artwork[]{
   if(seen.has(key))return false;seen.add(key);return true;
  });
 }
-/** Offline title index for games and anime: needs no Worker, only the static JSON shards shipped with the site. */
+/** Offline title index for games and anime: needs no search backend, only the static JSON shards shipped with the site. */
 async function searchLocalIndex(q:string,category:string,signal?:AbortSignal,onPartial?:(result:ProviderResult)=>void):Promise<ProviderResult>{
  try{
   if(category!=='games'&&category!=='anime'){
@@ -575,7 +576,7 @@ async function searchLocalIndex(q:string,category:string,signal?:AbortSignal,onP
   return {results:[],warnings:['Offline index: '+(error instanceof Error?error.message:'unavailable')],unavailable:[]};
  }
 }
-/** YouTube thumbnails need no key and no Worker: the image host is public and the id is in the link. */
+/** YouTube thumbnails need no key or search backend: the image host is public and the id is in the link. */
 export function youtubeVideoId(value:string):string|null{
  const text=value.trim();
  if(/^[A-Za-z0-9_-]{11}$/.test(text))return text;
@@ -595,7 +596,7 @@ async function youtubeThumbnails(q:string,signal?:AbortSignal):Promise<ProviderR
  return {results:[{id:'videos:youtube:'+id,category:'videos',title,subtitle:author,previewUrl:hq,imageUrl:maxres,sdDownloadUrl:hq,downloadUrl:maxres,hdDownloadUrls:[maxres,sd,hq],sourceUrl:'https://www.youtube.com/watch?v='+id,source:'YouTube thumbnails',provider:'YouTube thumbnails',kind:'thumbnail',rights:'source-only'}],warnings:[],unavailable:[]};
 }
 const LOCAL_ONLY_CATEGORIES=new Set<string>(['comics','boardgames','magazines','physicalmedia']);
-const WORKER_BACKED_CATEGORIES=new Set<string>(['games','webtoons']);
+const SEARCH_BACKED_CATEGORIES=new Set<string>(['games','webtoons']);
 function publicAnimeMangaItems(data:any,category:'anime'|'manga',provider:'AniList'|'Jikan / MyAnimeList'|'MangaDex'):Artwork[]{
  const rows=provider==='AniList'?data?.data?.Page?.media:provider==='MangaDex'?data?.data:data?.data;
  if(!Array.isArray(rows))return [];
@@ -686,10 +687,10 @@ async function searchArtworkUncached(q:string,category:Category,country:AppleSto
   try{return {results:await searchOfflineArt(q,signal,'books'),warnings:[],unavailable:[]};}
   catch(error){if(signal?.aborted)throw error;return {results:[],warnings:['Offline collection: '+(error instanceof Error?error.message:'unavailable')],unavailable:[]};}
  }
- // Collections with no live provider at all are served from the offline indexes alone; those with a Worker provider fall back to them when it is absent.
+ // Collections with no live provider at all are served from the offline indexes alone; those with a live search backend fall back to them when it is absent.
  if(hasTitleIndex(category)||category==='games'||category==='anime'){
-  const localOnly=LOCAL_ONLY_CATEGORIES.has(category),workerBacked=WORKER_BACKED_CATEGORIES.has(category);
-  if(source==='local-index'||(source==='all'&&(localOnly||(workerBacked&&!backend)))){
+  const localOnly=LOCAL_ONLY_CATEGORIES.has(category),searchBacked=SEARCH_BACKED_CATEGORIES.has(category);
+  if(source==='local-index'||(source==='all'&&(localOnly||(searchBacked&&!searchBackend)))){
    const local=await searchLocalIndex(q,category,signal,onPartial);
    const note=!local.results.length&&!local.warnings.length?[category==='games'?'No offline title matched. Try a platform name (PS2, SNES), a serial, or an exact title.':'No image-backed offline match. Try the original or English title, or search all connected sources.']:[];
    return {...local,warnings:[...local.warnings,...note]};
@@ -698,11 +699,11 @@ async function searchArtworkUncached(q:string,category:Category,country:AppleSto
  if(category==='art'){
   let local:Artwork[]=[];const warnings:string[]=[];
   if(source==='all'||source==='local')try{local=await searchOfflineArt(q,signal,'art');}catch(error){warnings.push(error instanceof Error?error.message:'Offline art index unavailable');}
-  if(source==='local'||!backend){const result={results:local,warnings:backend?warnings:[...warnings,...(local.length?[]:['Art search needs the RUPA Worker; the local CC0 collection remains available.'])],unavailable:backend?[]:['art']};onPartial?.(result);return result;}
-  try{const params=new URLSearchParams({q,category,country,source});const data=normalizeProviderResult(await json(backend+'/api/search?'+params.toString(),signal));const result={...data,results:dedupeArtwork([...local,...data.results]),warnings:[...warnings,...data.warnings]};onPartial?.(result);return result;}
+  if(source==='local'||!searchBackend){const result={results:local,warnings:searchBackend?warnings:[...warnings,...(local.length?[]:['Art search needs the live search backend; the local CC0 collection remains available.'])],unavailable:searchBackend?[]:['art']};onPartial?.(result);return result;}
+  try{const params=new URLSearchParams({q,category,country,source});const data=normalizeProviderResult(await json(searchBackend+'/api/search?'+params.toString(),signal));const result={...data,results:dedupeArtwork([...local,...data.results]),warnings:[...warnings,...data.warnings]};onPartial?.(result);return result;}
   catch(error){if(signal?.aborted)throw error;const result={results:local,warnings:[...warnings,error instanceof Error?error.message:'Art sources unavailable'],unavailable:['art']};onPartial?.(result);return result;}
  }
- if(category==='videos'&&!backend)return youtubeThumbnails(q,signal);
+ if(category==='videos'&&!searchBackend)return youtubeThumbnails(q,signal);
  if(!APPLE_SEARCH_CATEGORIES.has(category as AppleCategory)){
   if(category==='anime'||category==='manga'){
    const runPublicFallback=async()=>{
@@ -711,40 +712,40 @@ async function searchArtworkUncached(q:string,category:Category,country:AppleSto
     onPartial?.(merged);
     return merged;
    };
-   if(!backend)return runPublicFallback();
+   if(!searchBackend)return runPublicFallback();
    const params=new URLSearchParams({q,category,country,source});
    try{
-    const worker=normalizeProviderResult(await json(backend+'/api/search?'+params.toString(),signal));
-    if(worker.results.length&&worker.warnings.length===0)return {...worker,results:dedupeArtwork(worker.results)};
+    const backendResult=normalizeProviderResult(await json(searchBackend+'/api/search?'+params.toString(),signal));
+    if(backendResult.results.length&&backendResult.warnings.length===0)return {...backendResult,results:dedupeArtwork(backendResult.results)};
     const fallback=await runPublicFallback();
-    const result={...fallback,results:dedupeArtwork([...worker.results,...fallback.results]),warnings:uniqueStrings([...worker.warnings,...fallback.warnings])};
+    const result={...fallback,results:dedupeArtwork([...backendResult.results,...fallback.results]),warnings:uniqueStrings([...backendResult.warnings,...fallback.warnings])};
     onPartial?.(result);return result;
    }catch(error){
     if(signal?.aborted)throw error;
     const fallback=await runPublicFallback();
-    const result={...fallback,warnings:uniqueStrings([...fallback.warnings,error instanceof Error?`RUPA Worker: ${error.message}`:'RUPA Worker unavailable'])};
+    const result={...fallback,warnings:uniqueStrings([...fallback.warnings,error instanceof Error?`RUPA search backend: ${error.message}`:'RUPA search backend unavailable'])};
     onPartial?.(result);return result;
    }
   }
   if(category==='games'&&import.meta.env?.DEV&&['vitahex','all','retro'].includes(source)){
    try{
     const local=await searchLocalVita(q,signal);
-    if(source==='vitahex'||!backend)return {...local,warnings:[...local.warnings,...(backend?[]:['Searching the local PS Vita mirror only; connect the Worker for other game sources.'])],unavailable:local.results.length?local.unavailable:category==='games'?['games']:local.unavailable};
-   }catch(error){if(source==='vitahex'||!backend)return {results:[],warnings:[error instanceof Error?error.message:'Local PS Vita mirror is unavailable.'],unavailable:['games']};}
+    if(source==='vitahex'||!searchBackend)return {...local,warnings:[...local.warnings,...(searchBackend?[]:['Searching the local PS Vita mirror only; connect the live search backend for other game sources.'])],unavailable:local.results.length?local.unavailable:category==='games'?['games']:local.unavailable};
+   }catch(error){if(source==='vitahex'||!searchBackend)return {results:[],warnings:[error instanceof Error?error.message:'Local PS Vita mirror is unavailable.'],unavailable:['games']};}
   }
-  if(!backend)return {results:[],warnings:['This collection needs the RUPA Worker. The offline art collection is available without it.'],unavailable:[category]};
+  if(!searchBackend)return {results:[],warnings:['This collection needs the live search backend. The offline art collection is available without it.'],unavailable:[category]};
   const local=category==='games'&&source==='all'?await searchLocalIndex(q,category,signal):null;
   const params=new URLSearchParams({q,category,country,source});
   if(category==='games'&&gameAssetFilter)params.set('asset',gameAssetFilter);
   try{
-   const data=normalizeProviderResult(await json(backend+'/api/search?'+params.toString(),signal));
+   const data=normalizeProviderResult(await json(searchBackend+'/api/search?'+params.toString(),signal));
    return {...data,results:dedupeArtwork([...(local?.results||[]),...localizeVitaImages(data.results)]),warnings:[...(local?.warnings||[]),...data.warnings]};
   }catch(error){
    if(signal?.aborted||!local?.results.length)throw error;
-   return {...local,warnings:[...local.warnings,error instanceof Error?error.message:'Worker sources unavailable']};
+   return {...local,warnings:[...local.warnings,error instanceof Error?error.message:'Search sources unavailable']};
   }
  }
- if(backend){const params=new URLSearchParams({q,category,country,source});const data=normalizeProviderResult(await json(backend+'/api/search?'+params.toString(),signal));return withOfflineMatches({...data,results:dedupeArtwork(data.results)},q,category,source,signal);}
+ if(searchBackend){const params=new URLSearchParams({q,category,country,source});const data=normalizeProviderResult(await json(searchBackend+'/api/search?'+params.toString(),signal));return withOfflineMatches({...data,results:dedupeArtwork(data.results)},q,category,source,signal);}
  const warnings:string[]=[],unavailable:string[]=[],results:Artwork[]=[];
  const runners:Record<AppleCategory,()=>Promise<Artwork[]>>={
   music:()=>music(q,country,signal),musicvideos:()=>appleCatalogSearch(q,'musicvideos',country,signal),
@@ -753,12 +754,12 @@ async function searchArtworkUncached(q:string,category:Category,country:AppleSto
   apps:()=>appleCatalogSearch(q,'apps',country,signal),appscreenshots:()=>appleCatalogSearch(q,'appscreenshots',country,signal),movies:()=>appleCatalogSearch(q,'movies',country,signal),tv:()=>appleCatalogSearch(q,'tv',country,signal)
  };
  const publish=()=>onPartial?.({results:[...results],warnings:[...warnings],unavailable:[...unavailable]});
- if(source!=='all'&&source!=='apple')return {results:[],warnings:['This source needs the RUPA Worker.'],unavailable:[category]};
+ if(source!=='all'&&source!=='apple')return {results:[],warnings:['This source needs the live search backend.'],unavailable:[category]};
  try{results.push(...(await runners[category as AppleCategory]()).slice(0,category==='music'?200:20));}catch(error){if(!signal?.aborted)warnings.push(category+': '+(error instanceof Error?error.message:'unavailable'));}
  publish();return withOfflineMatches({results,warnings:uniqueStrings(warnings),unavailable:uniqueStrings(unavailable)},q,category,source,signal);
 }
 export async function searchArtwork(q:string,category:Category,signal?:AbortSignal,onPartial?:(result:ProviderResult)=>void,country:AppleStorefront='id',source='all',gameAssetFilter?:string):Promise<ProviderResult> {
- const normalized=q.trim().slice(0,180),key=(backend?'worker':'direct')+':'+country+':'+category+':'+source+':'+(gameAssetFilter||'-')+':'+normalized.toLocaleLowerCase();const cached=SEARCH_CACHE.get(key);
+ const normalized=q.trim().slice(0,180),key=(searchBackend?'server':'direct')+':'+country+':'+category+':'+source+':'+(gameAssetFilter||'-')+':'+normalized.toLocaleLowerCase();const cached=SEARCH_CACHE.get(key);
  if(cached&&Date.now()-cached.at<SEARCH_CACHE_TTL){onPartial?.(cached.value);return cached.value;}
  const result=await searchArtworkUncached(normalized,category,country,source,signal,onPartial,gameAssetFilter);
  if(!signal?.aborted&&!result.warnings.length){SEARCH_CACHE.set(key,{at:Date.now(),value:result});if(SEARCH_CACHE.size>80)SEARCH_CACHE.delete(SEARCH_CACHE.keys().next().value as string);}
