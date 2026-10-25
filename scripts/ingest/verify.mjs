@@ -8,15 +8,8 @@ import { imageInfo } from '../lib/imageinfo.mjs';
 const ROOT = path.resolve(import.meta.dirname, '../..');
 const read = async file => JSON.parse(await readFile(path.join(ROOT, file), 'utf8'));
 export const LIMITS = { maxFileBytes: 10_000_000, maxOfflineBytes: 230_000_000, minMirrorLongEdge: 1200 };
-// Provider credentials are not allowed in offline ingest or public config. SteamGridDB is the
-// documented exception for live Worker search; its secret is checked separately below.
-const KEY_PATTERN = /\b(TMDB_[A-Z_]*|IGDB_[A-Z_]*|TWITCH_CLIENT_[A-Z]+|YOUTUBE_API_KEY|FANART_[A-Z_]*|TVDB_[A-Z_]*|DISCOGS_[A-Z_]*|LASTFM_[A-Z_]*|COMICVINE_[A-Z_]*|RAWG_[A-Z_]*|SCREENSCRAPER_[A-Z_]*|GOOGLE_BOOKS_API_KEY|APPLE_MUSIC_DEVELOPER_TOKEN)\b/;
-const STEAMGRIDDB_KEY_PATTERN = /\bSTEAMGRIDDB_[A-Z_]*\b/g;
-const SAFE_WORKER_DEPLOY_SECRET_LINES = new Set([
-  'STEAMGRIDDB_API_KEY: ${{ secrets.STEAMGRIDDB_API_KEY }}',
-  '[[ -n "$STEAMGRIDDB_API_KEY" ]] || missing+=("STEAMGRIDDB_API_KEY")',
-  'run: printf \'%s\' "$STEAMGRIDDB_API_KEY" | npx wrangler secret put STEAMGRIDDB_API_KEY --config worker/wrangler.toml',
-]);
+// Provider credentials are not allowed in offline ingest or public config.
+const KEY_PATTERN = /\b(TMDB_[A-Z_]*|IGDB_[A-Z_]*|TWITCH_CLIENT_[A-Z]+|YOUTUBE_API_KEY|FANART_[A-Z_]*|TVDB_[A-Z_]*|DISCOGS_[A-Z_]*|LASTFM_[A-Z_]*|COMICVINE_[A-Z_]*|RAWG_[A-Z_]*|SCREENSCRAPER_[A-Z_]*|GOOGLE_BOOKS_API_KEY|APPLE_MUSIC_DEVELOPER_TOKEN|STEAMGRIDDB_[A-Z_]*)\b/;
 
 async function walk(dir) {
   const out = [];
@@ -65,12 +58,9 @@ export async function verifyRights() {
   const errors = [];
   const registry = await read('data/registry/sources.json'), ledger = await read('data/provenance/rights-ledger.json');
   for (const source of registry.sources) {
-    const documentedWorkerProvider = source.id === 'steamgriddb' && source.role === 'reference'
-      && source.requiresProviderApiKey === true && source.upstream === 'https://www.steamgriddb.com/api/v2'
-      && source.imageMode === 'remote-reference';
-    if (source.role !== 'rejected' && source.requiresProviderApiKey !== false && !documentedWorkerProvider) errors.push(`registry: ${source.id} is active but requiresProviderApiKey != false`);
+    if (source.role !== 'rejected' && source.requiresProviderApiKey !== false) errors.push(`registry: ${source.id} is active but requiresProviderApiKey != false`);
     if (source.role === 'rejected' && source.requiresProviderApiKey !== true) errors.push(`registry: rejected ${source.id} should record why (requiresProviderApiKey)`);
-    if (source.implemented === true && source.status === 'candidate' && !documentedWorkerProvider) errors.push(`registry: ${source.id} is implemented but still marked candidate`);
+    if (source.implemented === true && source.status === 'candidate') errors.push(`registry: ${source.id} is implemented but still marked candidate`);
   }
   for (const entry of ledger.entries) {
     if (entry.mirrored) {
@@ -92,7 +82,7 @@ export async function verifyRights() {
       if (parsed.protocol !== 'https:' || /^(localhost|127\.|10\.|192\.168\.|169\.254\.)/.test(parsed.hostname)) errors.push(`${file}: unsafe imageBase ${url}`);
     }
   }
-  // Keep provider keys out of offline/config/browser files. SteamGridDB may be read only from the Worker runtime env.
+  // Keep provider keys out of offline/config/browser files and Worker source.
   for (const rel of ['worker/src', 'worker/wrangler.toml', '.env.example', 'src', '.github/workflows']) {
     const target = path.join(ROOT, rel);
     const files = (await stat(target)).isDirectory() ? (await walk(target)).filter(file => /\.(js|ts|tsx|toml|yml|yaml|json|d\.ts)$/.test(file)) : [target];
@@ -100,19 +90,7 @@ export async function verifyRights() {
       const text = await readFile(file, 'utf8');
       const relativePath = path.relative(ROOT, file).replace(/\\/g, '/');
       const hit = text.match(KEY_PATTERN);
-      if (hit) errors.push(`${relativePath}: references provider credential ${hit[0]}`);
-      const isWorkerSecretBinding = relativePath === 'worker/src/search.js'
-        && text.includes('env?.STEAMGRIDDB_API_KEY');
-      const isSecureWorkerDeployWorkflow = relativePath === '.github/workflows/deploy-worker.yml'
-        && text.includes('STEAMGRIDDB_API_KEY: ${{ secrets.STEAMGRIDDB_API_KEY }}')
-        && text.includes('wrangler secret put STEAMGRIDDB_API_KEY');
-      for (const match of text.matchAll(STEAMGRIDDB_KEY_PATTERN)) {
-        const lineStart = text.lastIndexOf('\n', match.index - 1) + 1;
-        const lineEnd = text.indexOf('\n', match.index);
-        const line = text.slice(lineStart, lineEnd < 0 ? text.length : lineEnd).trim();
-        const isSafeWorkflowBinding = isSecureWorkerDeployWorkflow && SAFE_WORKER_DEPLOY_SECRET_LINES.has(line);
-        if (!isWorkerSecretBinding && !isSafeWorkflowBinding) errors.push(`${relativePath}: references provider credential ${match[0]}`);
-      }
+      if (hit) errors.push(relativePath+': references provider credential '+hit[0]);
     }
   }
   return { errors, entries: ledger.entries.length };

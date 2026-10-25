@@ -683,13 +683,13 @@
       "id": "steamgriddb",
       "name": "SteamGridDB",
       "role": "reference",
-      "status": "candidate",
+      "status": "active",
       "implemented": true,
-      "requiresProviderApiKey": true,
-      "upstream": "https://www.steamgriddb.com/api/v2",
+      "requiresProviderApiKey": false,
+      "upstream": "https://www.steamgriddb.com",
       "rightsMode": "source-linked reference art; no rights inferred",
       "imageMode": "remote-reference",
-      "notes": "Live title and artwork search through the Worker; configure STEAMGRIDDB_API_KEY as a Worker secret. Not probed from this ingest registry."
+      "notes": "The Worker searches public SteamGridDB HTML pages and references source-hosted images; no SteamGridDB provider key is used."
     },
     {
       "id": "fanart-tv",

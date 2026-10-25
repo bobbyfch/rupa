@@ -359,8 +359,7 @@ export async function mangaDexSeriesDetail({id='',title='',signal}={}){
   return result;
 }
 
-const SGDB_BASE_URL='https://www.steamgriddb.com/api/v2';
-const SGDB_ASSETS={
+const SGDB_SEARCH_TYPES={
   grids:{kind:'cover',label:'Grid',route:'grid'},
   heroes:{kind:'wallpaper',label:'Hero',route:'hero'},
   logos:{kind:'logo',label:'Logo',route:'logo'},
@@ -368,68 +367,142 @@ const SGDB_ASSETS={
 };
 const steamGridDbFilterTypes={
   covers:['grids'],screenshots:[],wallpapers:['heroes'],artworks:['heroes'],
-  logos:['logos'],icons:['icons'],'title-screens':[],all:Object.keys(SGDB_ASSETS),
+  logos:['logos'],icons:['icons'],'title-screens':[],all:Object.keys(SGDB_SEARCH_TYPES),
 };
-const normalizeGameName=value=>string(value,180).toLocaleLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
-function steamGridDbImage(value){
-  const url=https(value);if(!url)return '';
-  try{
-    const parsed=new URL(url),host=parsed.hostname.toLocaleLowerCase();
-    return host==='steamgriddb.com'||host.endsWith('.steamgriddb.com')
-      ||(host==='s3.amazonaws.com'&&parsed.pathname.startsWith('/steamgriddb/'))?url:'';
-  }catch{return '';}
+const normalizeGameName=value=>string(value,180).normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+function decodeHtmlEntities(value) {
+  return String(value||'')
+    .replace(/&amp;/gi,'&').replace(/&quot;/gi,'"').replace(/&#39;|&apos;/gi,"'")
+    .replace(/&lt;/gi,'<').replace(/&gt;/gi,'>')
+    .replace(/&#(x[0-9a-f]+|\d+);?/gi,(entity,code)=>{
+      const point=code[0].toLowerCase()==='x'?parseInt(code.slice(1),16):parseInt(code,10);
+      try{return Number.isInteger(point)&&point>0&&point<=0x10ffff?String.fromCodePoint(point):entity;}catch{return entity;}
+    });
 }
-export async function steamGridDbArtworks(query,limit,apiKey,signal,assetFilter='covers') {
-  const term=string(query,90),key=string(apiKey,300);
+function htmlAttribute(tag,name) {
+  const pattern=new RegExp("(?:^|\\s)"+name+"\\s*=\\s*(?:\"([^\"]*)\"|\\x27([^\\x27]*)\\x27|([^\\s>]+))","i");
+  const match=String(tag||'').match(pattern);
+  return decodeHtmlEntities(match?.[1]??match?.[2]??match?.[3]??'');
+}
+function steamGridDbImage(value,type) {
+  try {
+    const image=new URL(value);
+    if(image.protocol!=='https:'||image.hostname.toLowerCase()!=='cdn2.steamgriddb.com')return '';
+    const route=SGDB_SEARCH_TYPES[type]?.route;
+    const allowed=image.pathname.startsWith('/thumb/')||(route&&image.pathname.startsWith('/'+route+'/'));
+    return allowed?image.href:'';
+  } catch {return '';}
+}
+function steamGridDbAnchors(block) {
+  return [...block.matchAll(/<a\b[^>]*>[\s\S]*?<\/a>/gi)].map(match=>{
+    const tag=match[0].slice(0,match[0].indexOf('>')+1);
+    const classes=htmlAttribute(tag,'class').split(/\s+/).filter(Boolean);
+    const inner=match[0].slice(tag.length,match[0].lastIndexOf('</a>'));
+    return {tag,classes,href:htmlAttribute(tag,'href'),text:decodeHtmlEntities(inner.replace(/<[^>]*>/g,' ')).replace(/\s+/g,' ').trim()};
+  });
+}
+function steamGridDbDivEnd(html,start) {
+  const openEnd=html.indexOf('>',start)+1;
+  if(openEnd<1)return -1;
+  const tags=/<\/?div\b[^>]*>/gi;
+  tags.lastIndex=openEnd;
+  let depth=1,match;
+  while((match=tags.exec(html))){
+    if(/^<\//.test(match[0]))depth--;
+    else if(!/\/>$/.test(match[0]))depth++;
+    if(depth===0)return tags.lastIndex;
+  }
+  return -1;
+}
+function steamGridDbAssetCards(html) {
+  const cards=[],tags=/<div\b[^>]*>/gi;
+  let match;
+  while((match=tags.exec(html))&&cards.length<240){
+    if(!htmlAttribute(match[0],'class').split(/\s+/).includes('asset'))continue;
+    const end=steamGridDbDivEnd(html,match.index);
+    if(end<0)break;
+    cards.push(html.slice(match.index,end));
+    tags.lastIndex=end;
+  }
+  return cards;
+}
+function steamGridDbCard(card,query,type,index) {
+  const endpoint=SGDB_SEARCH_TYPES[type],anchors=steamGridDbAnchors(card);
+  const game=anchors.find(anchor=>anchor.classes.includes('game-name'));
+  if(!game||!endpoint)return null;
+  let gameId='';
+  try{gameId=new URL(game.href,'https://www.steamgriddb.com').pathname.match(/^\/game\/(\d+)\/?$/)?.[1]||'';}catch{}
+  const title=string(game.text,180);
+  const normalizedQuery=normalizeGameName(query),normalizedTitle=normalizeGameName(title);
+  if(!gameId||!title||!normalizedTitle||!normalizedQuery)return null;
+  const rank=normalizedTitle===normalizedQuery?0:normalizedTitle.startsWith(normalizedQuery)?1:normalizedTitle.includes(normalizedQuery)?2:normalizedQuery.includes(normalizedTitle)?3:99;
+  if(rank===99)return null;
+  const detail=anchors.map(anchor=>{
+    try{
+      const url=new URL(anchor.href,'https://www.steamgriddb.com');
+      const match=url.hostname==='www.steamgriddb.com'&&url.pathname.match(/^\/(grid|hero|logo|icon)\/(\d+)\/?$/);
+      return match?{url:url.href,route:match[1],assetId:match[2]}:null;
+    }catch{return null;}
+  }).find(value=>value&&value.route===endpoint.route);
+  const images=[...card.matchAll(/<img\b[^>]*>/gi)].map(match=>match[0]);
+  const originals=anchors.map(anchor=>steamGridDbImage(anchor.href,type)).filter(url=>url&&!new URL(url).pathname.startsWith('/thumb/'));
+  const inlineImages=images.flatMap(tag=>[htmlAttribute(tag,'src'),htmlAttribute(tag,'data-src'),htmlAttribute(tag,'data-original')])
+    .map(url=>steamGridDbImage(url,type)).filter(Boolean);
+  const imageUrl=originals[0]||inlineImages.find(url=>!new URL(url).pathname.startsWith('/thumb/'))||inlineImages[0]||'';
+  const previewUrl=inlineImages.find(url=>new URL(url).pathname.startsWith('/thumb/'))||imageUrl;
+  if(!detail||!imageUrl)return null;
+  const uploader=anchors.find(anchor=>anchor.classes.includes('user-link'))?.text||'';
+  const assetId=detail.assetId;
+  return {
+    id:'games:steamgriddb:'+gameId+':'+type+':'+assetId,category:'games',title,
+    subtitle:'PC · '+endpoint.label+' · SteamGridDB',source:'SteamGridDB',provider:'SteamGridDB public site',
+    sourceId:'steamgriddb',sourceUrl:detail.url,imageUrl,previewUrl,
+    mediaId:String(gameId),externalId:String(assetId),editionId:'steamgriddb:'+gameId,
+    kind:endpoint.kind,rights:'source-only',availability:'link-only',
+    artist:uploader||undefined,attribution:uploader?'Uploaded by '+uploader+' on SteamGridDB':'SteamGridDB community artwork',
+    _rank:rank,_index:index,
+  };
+}
+async function scrapeSteamGridDbType(query,limit,type,signal) {
+  const page=new URL('/search/'+type,'https://www.steamgriddb.com');
+  page.searchParams.set('term',query);
+  const response=await fetch(page.href,{
+    signal:combinedSignal(signal,10000),
+    headers:{Accept:'text/html,application/xhtml+xml;q=0.9,*/*;q=0.8','Accept-Language':'en-US,en;q=0.8'},
+  });
+  if(!response.ok)throw new Error('SteamGridDB website HTTP '+response.status);
+  const length=Number(response.headers.get('content-length')||0);
+  if(length>6*1024*1024)throw new Error('SteamGridDB search page exceeded the size limit.');
+  const html=await response.text();
+  if(html.length>6*1024*1024)throw new Error('SteamGridDB search page exceeded the size limit.');
+  const cards=steamGridDbAssetCards(html);
+  if(!cards.length&&/(just a moment|cf-challenge|verify you are human|access denied)/i.test(html))throw new Error('SteamGridDB blocked the public page request.');
+  return cards.map((card,index)=>steamGridDbCard(card,query,type,index)).filter(Boolean)
+    .sort((a,b)=>a._rank-b._rank||a._index-b._index).slice(0,Math.max(1,limit))
+    .map(({_rank,_index,...asset})=>asset);
+}
+export async function steamGridDbArtworks(query,limit,signal,assetFilter='covers') {
+  const term=string(query,90);
   if(term.length<2)return [];
-  if(!key)throw new Error('SteamGridDB requires a configured Worker secret.');
   const types=steamGridDbFilterTypes[assetFilter]||steamGridDbFilterTypes.covers;
   if(!types.length)return [];
-  const search=await api(`${SGDB_BASE_URL}/search/autocomplete/${encodeURIComponent(term)}`,{
-    headers:{Authorization:`Bearer ${key}`},
-  },signal);
-  if(search?.success!==true||!Array.isArray(search.data))throw new Error('SteamGridDB returned an invalid title search response.');
-  const normalizedQuery=normalizeGameName(term);
-  const games=search.data.map((game,index)=>{
-    const name=string(game?.name,180),normalizedName=normalizeGameName(name);
-    const rank=normalizedName===normalizedQuery?0:normalizedName.startsWith(normalizedQuery)?1:normalizedName.includes(normalizedQuery)?2:normalizedQuery.includes(normalizedName)?3:99;
-    return {id:Number(game?.id),name,index,rank};
-  }).filter(game=>Number.isSafeInteger(game.id)&&game.id>0&&game.name&&game.rank<99)
-    .sort((a,b)=>a.rank-b.rank||a.index-b.index).slice(0,3);
-  if(!games.length)return [];
-  const settled=await Promise.allSettled(games.flatMap(game=>types.map(async type=>{
-    const endpoint=SGDB_ASSETS[type];
-    const payload=await api(`${SGDB_BASE_URL}/${type}/game/${game.id}`,{
-      headers:{Authorization:`Bearer ${key}`},
-    },signal);
-    if(payload?.success!==true||!Array.isArray(payload.data))throw new Error('SteamGridDB returned an invalid artwork response.');
-    return payload.data.map(asset=>{
-      const imageUrl=steamGridDbImage(asset?.url),previewUrl=steamGridDbImage(asset?.thumb)||imageUrl;
-      if(!imageUrl)return null;
-      const assetId=Number(asset?.id);if(!Number.isSafeInteger(assetId)||assetId<1)return null;
-      const author=string(asset?.author?.name,120);
-      const sourceUrl=`https://www.steamgriddb.com/${endpoint.route}/${assetId}`;
-      return {
-        id:`games:steamgriddb:${game.id}:${type}:${assetId}`,category:'games',title:game.name,
-        subtitle:`PC · ${endpoint.label} · SteamGridDB`,source:'SteamGridDB',provider:'SteamGridDB API',
-        sourceId:'steamgriddb',sourceUrl,imageUrl,previewUrl,
-        mediaId:String(game.id),externalId:String(assetId),editionId:`steamgriddb:${game.id}`,
-        kind:endpoint.kind,rights:'source-only',availability:'link-only',
-        artist:author||undefined,attribution:author?`Uploaded by ${author} on SteamGridDB`:'SteamGridDB community artwork',
-        tags:Array.isArray(asset?.tags)?asset.tags.map(tag=>string(tag,80)).filter(Boolean).slice(0,8):[],
-      };
-    }).filter(Boolean);
-  })));
-  const results=settled.flatMap(entry=>entry.status==='fulfilled'?entry.value:[]);
-  const failures=settled.filter(entry=>entry.status==='rejected');
+  const settled=await Promise.allSettled(types.map(type=>scrapeSteamGridDbType(term,limit,type,signal)));
+  const buckets=settled.map(entry=>entry.status==='fulfilled'?entry.value:[]);
+  const results=[];
+  for(let index=0;results.length<Math.max(0,limit);index++){
+    let added=false;
+    for(const bucket of buckets)if(bucket[index]&&results.length<limit){results.push(bucket[index]);added=true;}
+    if(!added)break;
+  }
   if(signal?.aborted)throw signal.reason||new DOMException('Request cancelled.','AbortError');
+  const failures=settled.filter(entry=>entry.status==='rejected');
   if(failures.length===settled.length)throw failures[0].reason;
   if(failures.length){
-    const error=new Error('Some SteamGridDB artwork types were unavailable.');
+    const error=new Error('Some SteamGridDB public search pages were unavailable.');
     error.partialResults=results;
     throw error;
   }
-  return results.slice(0,Math.max(0,limit));
+  return results;
 }
 
 export async function additionalGames(query,signal) {

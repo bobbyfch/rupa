@@ -360,18 +360,18 @@ async function jikanSearch(query,limit,category,{fallback=false}={}) {
   }catch(error){if(error?.name==='AbortError')throw error;if(fallback)return aniList(query,limit,category);throw error;}
   return fallback?aniList(query,limit,category):[];
 }
-async function games(query,limit,source='all',signal,apiKey,assetFilter='covers') {
+async function games(query,limit,source='all',signal,assetFilter='covers') {
   const sources={
     vitahex:()=>vitaHexCovers(query,limit,signal),
     retro:()=>additionalGames(query,signal).then(x=>x.results),
-    steamgriddb:()=>steamGridDbArtworks(query,limit,apiKey,signal,assetFilter),
+    steamgriddb:()=>steamGridDbArtworks(query,limit,signal,assetFilter),
   };
   if(source!=='all')return sources[source]?sources[source]():[];
   const providers=[
     {name:'HexFlow PS Vita',search:sources.vitahex},
     {name:'xlenore & Libretro exact matches',search:sources.retro},
+    {name:'SteamGridDB',search:sources.steamgriddb},
   ];
-  if(apiKey)providers.push({name:'SteamGridDB',search:sources.steamgriddb});
   return mergeSources(providers);
 }
 function youtubeVideoId(value){
@@ -558,7 +558,7 @@ export async function onRequestGet({ request, env }) {
       case 'art': return openArtworks(query,limit,source,request.signal).then(data=>data.items);
       case 'anime': case 'manga': return animeOrManga(query,limit,kind,source);
       case 'webtoons': return mangaDexCovers(query,limit,request.signal,'webtoons');
-      case 'games': return games(query,limit,source,request.signal,env?.STEAMGRIDDB_API_KEY,gameAssetFilter);
+      case 'games': return games(query,limit,source,request.signal,gameAssetFilter);
       case 'videos': return youtubeVideos(query,limit,request.signal);
       default: return Promise.resolve([]);
     }

@@ -60,7 +60,7 @@ const sourceOptions: Partial<Record<Category, SourceOption[]>> = {
     { id: 'local-index', label: 'Offline title index', note: '17 platforms, no Worker' },
     { id: 'retro', label: 'PS1 / PS2 / Libretro' },
     { id: 'vitahex', label: 'HexFlow · PS Vita', note: 'Exact title index / App ID' },
-    { id: 'steamgriddb', label: 'SteamGridDB · PC artwork', note: 'Live API search; Worker secret required' },
+    { id: 'steamgriddb', label: 'SteamGridDB · PC artwork', note: 'Live public-page scrape through the Worker' },
   ],
   videos: [
     { id: 'all', label: 'YouTube thumbnails' },

@@ -9,3 +9,4 @@ export function deezerAlbums(query: string, limit?: number, signal?: AbortSignal
 export function musicBrainzCaa(query: string, limit?: number, signal?: AbortSignal): Promise<Artwork[]>;
 export function mangaDexCovers(query: string, limit?: number, signal?: AbortSignal, category?: 'manga' | 'webtoons'): Promise<Artwork[]>;
 export function additionalGames(query: string, signal?: AbortSignal): Promise<{ results: Artwork[]; warnings: string[] }>;
+export function steamGridDbArtworks(query: string, limit: number, signal?: AbortSignal, assetFilter?: string): Promise<Artwork[]>;
