@@ -1,6 +1,6 @@
 # Sources and data paths
 
-Updated 2026-10-24. Rupa records where a result came from and whether its image is mirrored, indexed at the source, or link-only. Public access is not a license.
+Updated 2026-10-25. Rupa records where a result came from and whether its image is mirrored, indexed at the source, or link-only. Public access is not a license.
 
 ## Product sources
 
@@ -31,9 +31,9 @@ Updated 2026-10-24. Rupa records where a result came from and whether its image 
 
 ## Game art that is indexed today
 
-The game UI exposes four Libretro types: `Named_Boxarts`, `Named_Logos`, `Named_Snaps` (gameplay/screenshots), and `Named_Titles` (title screens). xlenore contributes default and 3D box covers for serial-matched PlayStation 1/2 results. VitaHEX contributes PS Vita covers. All are reference-only unless the upstream record says otherwise.
+The game UI exposes four Libretro types: `Named_Boxarts`, `Named_Logos`, `Named_Snaps` (gameplay/screenshots), and `Named_Titles` (title screens). xlenore contributes default and 3D box covers for serial-matched PlayStation 1/2 results. VitaHEX contributes PS Vita covers. SteamGridDB supplies on-demand PC grids, heroes, logos, and icons through its documented API; it requires the Worker secret `STEAMGRIDDB_API_KEY`. Image URLs remain upstream and all these results are reference-only unless the upstream record says otherwise.
 
-SteamGridDB and LaunchBox remain outbound discovery links. Rupa does not scrape their pages or import their images. IGDB, MobyGames, and other keyed databases are not required for core game search. No broad, keyless source with verified redistribution rights was found for publisher character art, promotional packs, console icons, or wallpapers; those asset kinds are not claimed as a complete indexed set.
+LaunchBox remains an outbound discovery link. Rupa queries SteamGridDB's API rather than scraping its web pages, and does not import its image files. IGDB, MobyGames, and other keyed databases are not required for core game search. No broad, keyless source with verified redistribution rights was found for publisher character art, promotional packs, console icons, or wallpapers; those asset kinds are not claimed as a complete indexed set.
 
 ## Patterns researched for source adapters
 
@@ -51,7 +51,7 @@ FMHY is a community-curated link directory, not a common catalog API. Its Readin
 | Books / audiobooks | Open Library, Standard Ebooks, Gutenberg, public-domain library catalogs, LibriVox | Open Library and LibriVox are live; public-domain books are indexed separately. Open Library is also a fallback for explicitly numbered manga work titles. The official cover guidance says to use `covers.openlibrary.org` image URLs and not crawl the cover service. |
 | Film / TV / anime | Cinemeta, TVmaze, AniList, Jikan, Apple; TMDB is another structured catalog | Current sources are wired. TMDB is a viable expansion after a server-side API token is configured; its official docs require API authentication and attribution for non-commercial API use. |
 | Manga / webtoons / comics | MangaDex, Open Library, AniList, Jikan/MAL, MangaUpdates, Comic Vine, official publisher catalogs | MangaDex remains primary for explicit volume labels. Open Library can supply numbered works where the catalog title is an exact series-plus-volume form; its catalogue coverage varies. Jikan supplies related images only. Comic Vine requires a site-specific API key; MangaUpdates is a discovery/database link, not a scraper target. |
-| Games | Existing Libretro/xlenore/VitaHEX indexes; FMHY lists IGDB, LaunchBox, RAWG, MobyGames, and Giant Bomb | IGDB exposes strong metadata/art fields but requires Twitch app credentials and OAuth in a server-side adapter. LaunchBox and SteamGridDB remain links until a documented public API/credential path is selected. Existing keyless indexes stay available. |
+| Games | Existing Libretro/xlenore/VitaHEX indexes and SteamGridDB API; FMHY lists IGDB, LaunchBox, RAWG, MobyGames, and Giant Bomb | SteamGridDB title search and grids, heroes, logos, and icons are live through the Worker when `STEAMGRIDDB_API_KEY` is configured. LaunchBox remains a link. Existing keyless indexes stay available. |
 | Apps | App Store, F-Droid | Both are live. Apple provides app icons plus device screenshots in the same app record, so screenshots remain inside app detail rather than becoming a separate search category. |
 | Podcasts / episodes | Apple Podcasts; Podcast Index is a possible metadata catalog | Apple is live. Do not add Podcast Index until its authentication and request limits are configured; episode artwork remains a separate item identity. |
 | Art / archives | Cleveland Museum, The Met, Smithsonian, Wellcome, NASA, Wikimedia Commons, Openverse | Existing providers and local rights ledger are the reliable path; each mirrored file still needs its own license evidence. |

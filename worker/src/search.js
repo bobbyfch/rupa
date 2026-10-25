@@ -1,8 +1,8 @@
-import { additionalGames, deezerAlbums, mangaDexCovers, musicBrainzCaa, vitaHexCovers } from './expanded-sources.js';
+import { additionalGames, deezerAlbums, mangaDexCovers, musicBrainzCaa, steamGridDbArtworks, vitaHexCovers } from './expanded-sources.js';
 const VALID_CATEGORIES = ['all', 'books', 'music', 'musicvideos', 'audiobooks', 'apps', 'appscreenshots', 'art', 'movies', 'tv', 'anime', 'manga', 'webtoons', 'games', 'videos', 'podcasts', 'podcastepisodes'];
 const ACTIVE_SEARCH_CATEGORIES = new Set(['books','music','musicvideos','audiobooks','apps','appscreenshots','podcasts','podcastepisodes','movies','tv','art','anime','manga','webtoons','games','videos']);
-const SOURCE_NAMES = { books: 'Apple Books / Open Library', music: 'Apple Music / Deezer / MusicBrainz', musicvideos: 'Apple Music videos', audiobooks: 'Apple Books / LibriVox', apps: 'App Store / F-Droid', appscreenshots: 'App Store screenshots', art: 'Offline CC0 / museums / Commons / Openverse', movies: 'Apple TV / Cinemeta', tv: 'Apple TV / Cinemeta / TVmaze', anime: 'Jikan / AniList', manga: 'MangaDex / Jikan', webtoons: 'MangaDex web comics', games: 'PS Vita / retro repositories', videos: 'YouTube thumbnails by link or ID', podcasts: 'Apple Podcasts', podcastepisodes: 'Apple Podcasts episodes' };
-const SOURCE_LABELS = { books:{apple:'Apple Books',openlibrary:'Open Library'},music:{apple:'Apple Music',deezer:'Deezer','musicbrainz-caa':'MusicBrainz + Cover Art Archive'},audiobooks:{apple:'Apple Books',librivox:'LibriVox'},movies:{apple:'Apple TV / iTunes',cinemeta:'Cinemeta'},tv:{apple:'Apple TV seasons',cinemeta:'Cinemeta',tvmaze:'TVmaze'},art:{local:'Offline CC0 art',met:'The Met',cleveland:'Cleveland Museum of Art',commons:'Wikimedia Commons',openverse:'Openverse'},apps:{apple:'App Store',fdroid:'F-Droid'},anime:{jikan:'Jikan / MyAnimeList',anilist:'AniList'},manga:{mangadex:'MangaDex',jikan:'Jikan / MyAnimeList',anilist:'AniList'},webtoons:{mangadex:'MangaDex · web comics'},games:{retro:'PS1 / PS2 / Libretro',vitahex:'HexFlow · PS Vita'},videos:{youtube:'YouTube link / ID'} };
+const SOURCE_NAMES = { books: 'Apple Books / Open Library', music: 'Apple Music / Deezer / MusicBrainz', musicvideos: 'Apple Music videos', audiobooks: 'Apple Books / LibriVox', apps: 'App Store / F-Droid', appscreenshots: 'App Store screenshots', art: 'Offline CC0 / museums / Commons / Openverse', movies: 'Apple TV / Cinemeta', tv: 'Apple TV / Cinemeta / TVmaze', anime: 'Jikan / AniList', manga: 'MangaDex / Jikan', webtoons: 'MangaDex web comics', games: 'SteamGridDB / PS Vita / retro repositories', videos: 'YouTube thumbnails by link or ID', podcasts: 'Apple Podcasts', podcastepisodes: 'Apple Podcasts episodes' };
+const SOURCE_LABELS = { books:{apple:'Apple Books',openlibrary:'Open Library'},music:{apple:'Apple Music',deezer:'Deezer','musicbrainz-caa':'MusicBrainz + Cover Art Archive'},audiobooks:{apple:'Apple Books',librivox:'LibriVox'},movies:{apple:'Apple TV / iTunes',cinemeta:'Cinemeta'},tv:{apple:'Apple TV seasons',cinemeta:'Cinemeta',tvmaze:'TVmaze'},art:{local:'Offline CC0 art',met:'The Met',cleveland:'Cleveland Museum of Art',commons:'Wikimedia Commons',openverse:'Openverse'},apps:{apple:'App Store',fdroid:'F-Droid'},anime:{jikan:'Jikan / MyAnimeList',anilist:'AniList'},manga:{mangadex:'MangaDex',jikan:'Jikan / MyAnimeList',anilist:'AniList'},webtoons:{mangadex:'MangaDex · web comics'},games:{retro:'PS1 / PS2 / Libretro',vitahex:'HexFlow · PS Vita',steamgriddb:'SteamGridDB'},videos:{youtube:'YouTube link / ID'} };
 const sourceLabel = (category,source) => SOURCE_LABELS[category]?.[source] || SOURCE_NAMES[category] || category;
 const SEARCH_CACHE = new Map();
 const SEARCH_CACHE_TTL = 60_000;
@@ -360,17 +360,19 @@ async function jikanSearch(query,limit,category,{fallback=false}={}) {
   }catch(error){if(error?.name==='AbortError')throw error;if(fallback)return aniList(query,limit,category);throw error;}
   return fallback?aniList(query,limit,category):[];
 }
-async function games(query,limit,source='all',signal) {
+async function games(query,limit,source='all',signal,apiKey,assetFilter='covers') {
   const sources={
     vitahex:()=>vitaHexCovers(query,limit,signal),
     retro:()=>additionalGames(query,signal).then(x=>x.results),
+    steamgriddb:()=>steamGridDbArtworks(query,limit,apiKey,signal,assetFilter),
   };
   if(source!=='all')return sources[source]?sources[source]():[];
-  const merged=await mergeSources([
+  const providers=[
     {name:'HexFlow PS Vita',search:sources.vitahex},
     {name:'xlenore & Libretro exact matches',search:sources.retro},
-  ]);
-  return merged;
+  ];
+  if(apiKey)providers.push({name:'SteamGridDB',search:sources.steamgriddb});
+  return mergeSources(providers);
 }
 function youtubeVideoId(value){
   const input=value.trim();if(/^[A-Za-z0-9_-]{11}$/.test(input))return input;
@@ -517,6 +519,7 @@ export async function onRequestGet({ request, env }) {
   const query = str(requestUrl.searchParams.get('q') || '', 90);
   const category = requestUrl.searchParams.get('category') || 'all';
   const source = str(requestUrl.searchParams.get('source') || 'all',40).toLowerCase();
+  const gameAssetFilter=str(requestUrl.searchParams.get('asset')||'covers',20).toLowerCase();
   if (!VALID_CATEGORIES.includes(category)) return json({ error: 'Kategori tidak dikenal.' }, 400);
   const chartMode=str(requestUrl.searchParams.get('mode')||'',20).toLowerCase();
   const recentLibriVox=category==='audiobooks'&&source==='librivox'&&chartMode==='recent';
@@ -525,13 +528,14 @@ export async function onRequestGet({ request, env }) {
   const sourceOptions={
     music:['all','apple','deezer','musicbrainz-caa'],books:['all','apple','openlibrary'],
     movies:['all','apple','cinemeta'],tv:['all','apple','cinemeta','tvmaze'],art:['all','met','cleveland','commons','openverse'],
-    anime:['all','jikan','anilist'],manga:['all','mangadex','jikan','anilist'],webtoons:['all','mangadex'],games:['all','retro','vitahex'],videos:['all','youtube'],
+    anime:['all','jikan','anilist'],manga:['all','mangadex','jikan','anilist'],webtoons:['all','mangadex'],games:['all','retro','vitahex','steamgriddb'],videos:['all','youtube'],
     musicvideos:['all','apple'],audiobooks:['all','apple','librivox'],apps:['all','apple','fdroid'],appscreenshots:['all','apple'],podcasts:['all','apple'],podcastepisodes:['all','apple'],
   };
   if(!sourceOptions[category]?.includes(source))return json({error:'Sumber tidak tersedia untuk kategori ini.'},400);
+  if(category==='games'&&!['covers','screenshots','wallpapers','artworks','logos','icons','title-screens','all'].includes(gameAssetFilter))return json({error:'Jenis artwork game tidak tersedia.'},400);
   const requestedCountry=(requestUrl.searchParams.get('country')||'id').toLowerCase();
   const country=['id','us','gb','au','ca','jp','de','fr'].includes(requestedCountry)?requestedCountry:'id';
-  const cacheKey=`${country}:${category}:${source}:${chartMode}:${query.toLocaleLowerCase()}`;
+  const cacheKey=`${country}:${category}:${source}:${category==='games'?gameAssetFilter:'-'}:${chartMode}:${query.toLocaleLowerCase()}`;
   const cached=SEARCH_CACHE.get(cacheKey);
   if(cached&&Date.now()-cached.at<SEARCH_CACHE_TTL)return json(cached.value);
   if(SEARCH_CACHE.size>160)for(const [key,value] of SEARCH_CACHE)if(Date.now()-value.at>SEARCH_CACHE_TTL)SEARCH_CACHE.delete(key);
@@ -554,7 +558,7 @@ export async function onRequestGet({ request, env }) {
       case 'art': return openArtworks(query,limit,source,request.signal).then(data=>data.items);
       case 'anime': case 'manga': return animeOrManga(query,limit,kind,source);
       case 'webtoons': return mangaDexCovers(query,limit,request.signal,'webtoons');
-      case 'games': return games(query,limit,source,request.signal);
+      case 'games': return games(query,limit,source,request.signal,env?.STEAMGRIDDB_API_KEY,gameAssetFilter);
       case 'videos': return youtubeVideos(query,limit,request.signal);
       default: return Promise.resolve([]);
     }

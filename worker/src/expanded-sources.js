@@ -359,6 +359,79 @@ export async function mangaDexSeriesDetail({id='',title='',signal}={}){
   return result;
 }
 
+const STEAMGRIDDB_API='https://www.steamgriddb.com/api/v2';
+const STEAMGRIDDB_ASSETS={
+  grids:{kind:'cover',label:'Grid',route:'grid'},
+  heroes:{kind:'wallpaper',label:'Hero',route:'hero'},
+  logos:{kind:'logo',label:'Logo',route:'logo'},
+  icons:{kind:'icon',label:'Icon',route:'icon'},
+};
+const steamGridDbFilterTypes={
+  covers:['grids'],screenshots:[],wallpapers:['heroes'],artworks:['heroes'],
+  logos:['logos'],icons:['icons'],'title-screens':[],all:Object.keys(STEAMGRIDDB_ASSETS),
+};
+const normalizeGameName=value=>string(value,180).toLocaleLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+function steamGridDbImage(value){
+  const url=https(value);if(!url)return '';
+  try{
+    const parsed=new URL(url),host=parsed.hostname.toLocaleLowerCase();
+    return host==='steamgriddb.com'||host.endsWith('.steamgriddb.com')
+      ||(host==='s3.amazonaws.com'&&parsed.pathname.startsWith('/steamgriddb/'))?url:'';
+  }catch{return '';}
+}
+export async function steamGridDbArtworks(query,limit,apiKey,signal,assetFilter='covers') {
+  const term=string(query,90),key=string(apiKey,300);
+  if(term.length<2)return [];
+  if(!key)throw new Error('SteamGridDB requires a configured Worker secret: STEAMGRIDDB_API_KEY.');
+  const types=steamGridDbFilterTypes[assetFilter]||steamGridDbFilterTypes.covers;
+  if(!types.length)return [];
+  const search=await api(`${STEAMGRIDDB_API}/search/autocomplete/${encodeURIComponent(term)}`,{
+    headers:{Authorization:`Bearer ${key}`},
+  },signal);
+  if(search?.success!==true||!Array.isArray(search.data))throw new Error('SteamGridDB returned an invalid title search response.');
+  const normalizedQuery=normalizeGameName(term);
+  const games=search.data.map((game,index)=>{
+    const name=string(game?.name,180),normalizedName=normalizeGameName(name);
+    const rank=normalizedName===normalizedQuery?0:normalizedName.startsWith(normalizedQuery)?1:normalizedName.includes(normalizedQuery)?2:normalizedQuery.includes(normalizedName)?3:99;
+    return {id:Number(game?.id),name,index,rank};
+  }).filter(game=>Number.isSafeInteger(game.id)&&game.id>0&&game.name&&game.rank<99)
+    .sort((a,b)=>a.rank-b.rank||a.index-b.index).slice(0,3);
+  if(!games.length)return [];
+  const settled=await Promise.allSettled(games.flatMap(game=>types.map(async type=>{
+    const endpoint=STEAMGRIDDB_ASSETS[type];
+    const payload=await api(`${STEAMGRIDDB_API}/${type}/game/${game.id}`,{
+      headers:{Authorization:`Bearer ${key}`},
+    },signal);
+    if(payload?.success!==true||!Array.isArray(payload.data))throw new Error('SteamGridDB returned an invalid artwork response.');
+    return payload.data.map(asset=>{
+      const imageUrl=steamGridDbImage(asset?.url),previewUrl=steamGridDbImage(asset?.thumb)||imageUrl;
+      if(!imageUrl)return null;
+      const assetId=Number(asset?.id);if(!Number.isSafeInteger(assetId)||assetId<1)return null;
+      const author=string(asset?.author?.name,120);
+      const sourceUrl=`https://www.steamgriddb.com/${endpoint.route}/${assetId}`;
+      return {
+        id:`games:steamgriddb:${game.id}:${type}:${assetId}`,category:'games',title:game.name,
+        subtitle:`PC · ${endpoint.label} · SteamGridDB`,source:'SteamGridDB',provider:'SteamGridDB API',
+        sourceId:'steamgriddb',sourceUrl,imageUrl,previewUrl,
+        mediaId:String(game.id),externalId:String(assetId),editionId:`steamgriddb:${game.id}`,
+        kind:endpoint.kind,rights:'source-only',availability:'link-only',
+        artist:author||undefined,attribution:author?`Uploaded by ${author} on SteamGridDB`:'SteamGridDB community artwork',
+        tags:Array.isArray(asset?.tags)?asset.tags.map(tag=>string(tag,80)).filter(Boolean).slice(0,8):[],
+      };
+    }).filter(Boolean);
+  })));
+  const results=settled.flatMap(entry=>entry.status==='fulfilled'?entry.value:[]);
+  const failures=settled.filter(entry=>entry.status==='rejected');
+  if(signal?.aborted)throw signal.reason||new DOMException('Request cancelled.','AbortError');
+  if(failures.length===settled.length)throw failures[0].reason;
+  if(failures.length){
+    const error=new Error('Some SteamGridDB artwork types were unavailable.');
+    error.partialResults=results;
+    throw error;
+  }
+  return results.slice(0,Math.max(0,limit));
+}
+
 export async function additionalGames(query,signal) {
   return combined([{name:'xlenore PS1/PS2',search:()=>sonySerialCovers(query,signal)},
     {name:'Libretro Thumbnails',search:()=>libretroExactCover(query,signal)}]);

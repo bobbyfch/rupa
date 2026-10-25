@@ -681,7 +681,7 @@ function localizeVitaImages(results:Artwork[]):Artwork[]{
   return {...item,previewUrl:url,imageUrl:url,sdDownloadUrl:url,downloadUrl:url,hdDownloadUrls:[url]};
  });
 }
-async function searchArtworkUncached(q:string,category:Category,country:AppleStorefront,source:string,signal?:AbortSignal,onPartial?:(result:ProviderResult)=>void):Promise<ProviderResult> {
+async function searchArtworkUncached(q:string,category:Category,country:AppleStorefront,source:string,signal?:AbortSignal,onPartial?:(result:ProviderResult)=>void,gameAssetFilter?:string):Promise<ProviderResult> {
  if(category==='books'&&source==='local'){
   try{return {results:await searchOfflineArt(q,signal,'books'),warnings:[],unavailable:[]};}
   catch(error){if(signal?.aborted)throw error;return {results:[],warnings:['Offline collection: '+(error instanceof Error?error.message:'unavailable')],unavailable:[]};}
@@ -735,6 +735,7 @@ async function searchArtworkUncached(q:string,category:Category,country:AppleSto
   if(!backend)return {results:[],warnings:['This collection needs the RUPA Worker. The offline art collection is available without it.'],unavailable:[category]};
   const local=category==='games'&&source==='all'?await searchLocalIndex(q,category,signal):null;
   const params=new URLSearchParams({q,category,country,source});
+  if(category==='games'&&gameAssetFilter)params.set('asset',gameAssetFilter);
   try{
    const data=normalizeProviderResult(await json(backend+'/api/search?'+params.toString(),signal));
    return {...data,results:dedupeArtwork([...(local?.results||[]),...localizeVitaImages(data.results)]),warnings:[...(local?.warnings||[]),...data.warnings]};
@@ -756,10 +757,10 @@ async function searchArtworkUncached(q:string,category:Category,country:AppleSto
  try{results.push(...(await runners[category as AppleCategory]()).slice(0,category==='music'?200:20));}catch(error){if(!signal?.aborted)warnings.push(category+': '+(error instanceof Error?error.message:'unavailable'));}
  publish();return withOfflineMatches({results,warnings:uniqueStrings(warnings),unavailable:uniqueStrings(unavailable)},q,category,source,signal);
 }
-export async function searchArtwork(q:string,category:Category,signal?:AbortSignal,onPartial?:(result:ProviderResult)=>void,country:AppleStorefront='id',source='all'):Promise<ProviderResult> {
- const normalized=q.trim().slice(0,180),key=(backend?'worker':'direct')+':'+country+':'+category+':'+source+':'+normalized.toLocaleLowerCase();const cached=SEARCH_CACHE.get(key);
+export async function searchArtwork(q:string,category:Category,signal?:AbortSignal,onPartial?:(result:ProviderResult)=>void,country:AppleStorefront='id',source='all',gameAssetFilter?:string):Promise<ProviderResult> {
+ const normalized=q.trim().slice(0,180),key=(backend?'worker':'direct')+':'+country+':'+category+':'+source+':'+(gameAssetFilter||'-')+':'+normalized.toLocaleLowerCase();const cached=SEARCH_CACHE.get(key);
  if(cached&&Date.now()-cached.at<SEARCH_CACHE_TTL){onPartial?.(cached.value);return cached.value;}
- const result=await searchArtworkUncached(normalized,category,country,source,signal,onPartial);
+ const result=await searchArtworkUncached(normalized,category,country,source,signal,onPartial,gameAssetFilter);
  if(!signal?.aborted&&!result.warnings.length){SEARCH_CACHE.set(key,{at:Date.now(),value:result});if(SEARCH_CACHE.size>80)SEARCH_CACHE.delete(SEARCH_CACHE.keys().next().value as string);}
  return result;
 }

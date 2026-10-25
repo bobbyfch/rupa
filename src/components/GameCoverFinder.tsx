@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, ChevronDown, Database, Gamepad2, Info, LoaderCir
 import type { Artwork } from '../lib/types';
 import { browseGamePlatform, groupGameArtworks, loadManifest, normalizeText, searchGameIndex, searchModernGameIndex, MODERN_GAME_PLATFORMS } from '../lib/catalog';
 import type { GameAssetFilter, IndexManifest, PlatformBrowse } from '../lib/catalog';
+import { hasBackend, searchArtwork } from '../lib/providers';
 import { Button } from './ui/button';
 import { GameConsoleSelector } from './GameConsoleSelector';
 import { GameDetailPage } from './GameDetailPage';
@@ -74,6 +75,14 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
   const gameShards = (manifest?.shards || []).filter(shard => shard.kind === 'games');
   const classicRecordCount = gameShards.reduce((total, shard) => total + shard.rows, 0);
   const groupedResults = useMemo(() => groupGameArtworks(results), [results]);
+  const searchSteamGridDb = useCallback(async (term: string, assetFilter: GameAssetFilter, signal: AbortSignal) => {
+    if (!hasBackend) return [] as Artwork[];
+    const outcome = await searchArtwork(term, 'games', signal, undefined, 'id', 'steamgriddb', assetFilter);
+    if (!signal.aborted && outcome.warnings.length) {
+      setWarnings(current => [...new Set([...current, ...outcome.warnings])]);
+    }
+    return outcome.results;
+  }, []);
 
   const runSearch = useCallback(async (value: string, selectedPlatform: string): Promise<ReturnType<typeof groupGameArtworks>> => {
     const selectedAssets: GameAssetFilter = 'covers';
@@ -89,16 +98,25 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
     const cleanTerm = term.replace(/\b(?:playstation\s*[45]|ps[45]|nintendo\s*switch(?:\s*2)?|switch(?:\s*2)?|xbox\s*one|xbox\s*series(?:\s*x\s*\/\s*s)?|pc)\b/ig, ' ').replace(/\s+/g, ' ').trim() || term;
     try {
       if (platformMatch) {
-        const modern = await searchModernGameIndex(cleanTerm, platformMatch.id, selectedAssets, controller.signal);
-        if (!controller.signal.aborted) setResults(modern);
+        const modernSearch = searchModernGameIndex(cleanTerm, platformMatch.id, selectedAssets, controller.signal);
+        const steamSearch = platformMatch.id === 'pc' ? searchSteamGridDb(cleanTerm, selectedAssets, controller.signal) : Promise.resolve([] as Artwork[]);
+        const [modernOutcome, steamOutcome] = await Promise.allSettled([modernSearch, steamSearch]);
         if (controller.signal.aborted) return [];
-        return groupGameArtworks(modern);
+        const modern = modernOutcome.status === 'fulfilled' ? modernOutcome.value : [];
+        const steam = steamOutcome.status === 'fulfilled' ? steamOutcome.value : [];
+        if (modernOutcome.status === 'rejected') setWarnings(current => current.includes('Modern game sources could not be reached.') ? current : [...current, 'Modern game sources could not be reached.']);
+        if (steamOutcome.status === 'rejected') setWarnings(current => current.includes('SteamGridDB could not be reached.') ? current : [...current, 'SteamGridDB could not be reached.']);
+        const combined = [...new Map([...modern, ...steam].map(item => [item.id, item])).values()];
+        setResults(combined);
+        if (modernOutcome.status === 'rejected' && (platformMatch.id !== 'pc' || steamOutcome.status === 'rejected')) throw modernOutcome.reason;
+        return groupGameArtworks(combined);
       } else if (selectedPlatform === 'all') {
         let classicResults: Artwork[] = [];
         let modernResults: Artwork[] = [];
+        let steamResults: Artwork[] = [];
         const publishCombined = () => {
           if (controller.signal.aborted) return;
-          const unique = new Map([...classicResults, ...modernResults].map(item => [item.id, item]));
+          const unique = new Map([...classicResults, ...modernResults, ...steamResults].map(item => [item.id, item]));
           setResults([...unique.values()]);
         };
         const classicSearch = searchGameIndex(term, {
@@ -108,15 +126,18 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
           onWarning: message => { if (!controller.signal.aborted) setWarnings(current => current.includes(message) ? current : [...current, message]); },
         });
         const modernSearch = searchModernGameIndex(cleanTerm, 'all', selectedAssets, controller.signal);
-        const [classicOutcome, modernOutcome] = await Promise.allSettled([classicSearch, modernSearch]);
+        const steamSearch = hasBackend ? searchSteamGridDb(cleanTerm, selectedAssets, controller.signal).then(items => { steamResults = items; publishCombined(); return items; }) : Promise.resolve([] as Artwork[]);
+        const [classicOutcome, modernOutcome, steamOutcome] = await Promise.allSettled([classicSearch, modernSearch, steamSearch]);
         if (controller.signal.aborted) return [];
         if (classicOutcome.status === 'fulfilled') classicResults = classicOutcome.value;
         else setWarnings(current => current.includes('Classic console indexes could not be loaded.') ? current : [...current, 'Classic console indexes could not be loaded.']);
         if (modernOutcome.status === 'fulfilled') modernResults = modernOutcome.value;
         else setWarnings(current => current.includes('Modern game sources could not be reached.') ? current : [...current, 'Modern game sources could not be reached.']);
+        if (steamOutcome.status === 'fulfilled') steamResults = steamOutcome.value;
+        else setWarnings(current => current.includes('SteamGridDB could not be reached.') ? current : [...current, 'SteamGridDB could not be reached.']);
         publishCombined();
-        if (classicOutcome.status === 'rejected' && modernOutcome.status === 'rejected') throw classicOutcome.reason;
-        return groupGameArtworks([...new Map([...classicResults, ...modernResults].map(item => [item.id, item])).values()]);
+        if (classicOutcome.status === 'rejected' && modernOutcome.status === 'rejected' && steamResults.length === 0) throw classicOutcome.reason;
+        return groupGameArtworks([...new Map([...classicResults, ...modernResults, ...steamResults].map(item => [item.id, item])).values()]);
       } else {
         const hits = await searchGameIndex(term, {
           platform: selectedPlatform === 'all' ? undefined : selectedPlatform,
@@ -139,7 +160,7 @@ export function GameCoverFinder({ initialQuery = '', favoriteIds, onFavorite, on
       window.clearTimeout(timeoutId);
       if (request.current === controller) setLoading(false);
     }
-  }, []);
+  }, [searchSteamGridDb]);
 
   const browsePlatform = useCallback(async (selectedPlatform: string) => {
     const selectedAssets: GameAssetFilter = 'covers';

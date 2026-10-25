@@ -41,6 +41,8 @@ npm run dev
 
 The optional Cloudflare Worker adds same-origin image processing, expanded provider search, and encrypted cross-device sync. Set `VITE_API_URL` to its base URL to use it. Keep provider secrets in Worker environment variables; never expose secrets in client-side `VITE_*` variables.
 
+SteamGridDB game artwork search uses the v2 API through the Worker. Add the key as a Worker secret with `cd worker && npx wrangler secret put STEAMGRIDDB_API_KEY`. For local Worker development, add the same variable to `worker/.dev.vars`; that file is git-ignored. SteamGridDB previews remain remote references and do not grant reuse rights.
+
 ## Useful commands
 
 ```sh

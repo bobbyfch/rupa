@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "policy": "No third-party API key, token, premium account or anti-bot bypass. Status values are filled from data/checks/source-health.json after a live probe; anything not probed stays 'candidate'.",
+  "policy": "Offline ingest does not use third-party API keys, premium accounts, or anti-bot bypasses. Optional provider keys are allowed only for documented live search through server-side Worker secrets; image rights are never inferred. Status values are filled from data/checks/source-health.json after a live probe; anything not probed stays 'candidate'.",
   "rightsStatuses": [
     "cc0",
     "public-domain",
@@ -682,9 +682,14 @@
     {
       "id": "steamgriddb",
       "name": "SteamGridDB",
-      "role": "rejected",
-      "status": "rejected-requires-key",
-      "requiresProviderApiKey": true
+      "role": "reference",
+      "status": "candidate",
+      "implemented": true,
+      "requiresProviderApiKey": true,
+      "upstream": "https://www.steamgriddb.com/api/v2",
+      "rightsMode": "source-linked reference art; no rights inferred",
+      "imageMode": "remote-reference",
+      "notes": "Live title and artwork search through the Worker; configure STEAMGRIDDB_API_KEY as a Worker secret. Not probed from this ingest registry."
     },
     {
       "id": "fanart-tv",
