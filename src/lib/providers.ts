@@ -5,7 +5,7 @@ import { artworkMatches, hasTitleIndex, searchAnimeIndex, searchGameIndex, searc
 import { fetchOpenLibraryMangaSeries, mergeMangaSeriesDetails } from './mangaCatalog.ts';
 const backend = (import.meta.env?.VITE_API_URL || '').replace(/\/$/, '');
 const configuredSearchBackend = (import.meta.env?.VITE_SEARCH_API_URL || '').replace(/\/$/, '');
-const isGitHubPages = typeof window !== 'undefined' && /(^|\\.)github\\.io$/i.test(window.location.hostname);
+const isGitHubPages = typeof window !== 'undefined' && window.location.hostname.endsWith('.github.io');
 const searchBackend = configuredSearchBackend || (typeof window !== 'undefined' && !isGitHubPages ? window.location.origin : '');
 const API_REQUEST_TIMEOUT_MS=15_000;
 const MANGA_DETAIL_REQUEST_TIMEOUT_MS=28_000;
