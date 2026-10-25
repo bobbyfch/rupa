@@ -1,0 +1,50 @@
+name: Deploy Rupa API Worker
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Check required secrets
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          STEAMGRIDDB_API_KEY: ${{ secrets.STEAMGRIDDB_API_KEY }}
+        run: |
+          missing=()
+          [[ -n "$CLOUDFLARE_API_TOKEN" ]] || missing+=("CLOUDFLARE_API_TOKEN")
+          [[ -n "$CLOUDFLARE_ACCOUNT_ID" ]] || missing+=("CLOUDFLARE_ACCOUNT_ID")
+          [[ -n "$STEAMGRIDDB_API_KEY" ]] || missing+=("STEAMGRIDDB_API_KEY")
+          if (( ${#missing[@]} )); then
+            printf '::error::Add these repository Actions secrets before deploying: %s\n' "${missing[*]}"
+            exit 1
+          fi
+      - name: Create or update the Worker
+        run: npm run deploy:worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Install the SteamGridDB key as a Worker secret
+        shell: bash
+        run: printf '%s' "$STEAMGRIDDB_API_KEY" | npx wrangler secret put STEAMGRIDDB_API_KEY --config worker/wrangler.toml
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          STEAMGRIDDB_API_KEY: ${{ secrets.STEAMGRIDDB_API_KEY }}
+      - name: Next step
+        run: |
+          {
+            echo "## Worker deployed"
+            echo
+            echo "Copy the workers.dev URL shown in the deploy log into the repository Actions variable `VITE_API_URL`."
+            echo "Then rerun **Deploy RUPA to GitHub Pages** so the frontend connects to this Worker."
+          } >> "$GITHUB_STEP_SUMMARY"
