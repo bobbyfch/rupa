@@ -1,21 +1,23 @@
 # Rupa
 
-Rupa is a browser-based media downloader. Its first active tools are Apple Music artwork and direct media file URLs.
+Rupa is a static, browser-based media and artwork downloader. Apple tools are grouped in one workspace, with category filters for Music, Music Videos, Books, Audiobooks, Podcasts, Apps, Movies, TV, and artwork.
 
-## What works
+## Apple tools
 
-- Search Apple Music album artwork by album, artist, or Apple Music link, then download the image in its original format or export PNG, JPEG, or WebP.
-- Paste an Apple-hosted artwork image URL to download it directly.
-- Download a direct HTTPS image, audio, video, or file URL when its host allows browser cross-origin access (CORS). Direct downloads are capped at 100 MB.
-- Files are fetched and saved by the browser. Rupa does not host uploaded media or run its own download API.
+- Search Apple catalogs across categories, or select a category chip to scope the same search field.
+- Browse cover art in a responsive grid. Where Apple exposes motion artwork, the thumbnail plays muted while it is visible; users can pause it. Reduced-motion settings are respected.
+- Open an item to download or export artwork in supported formats, resize it, crop it, create wallpapers, and export available motion artwork as GIF, MP4, or WebM.
+- Preview Apple's short music-video clip and download that preview file when available. Apple does not provide the full music video through this catalog.
+- Open book previews on Apple Books when Apple provides a preview link.
+- Download direct HTTPS image, audio, video, or file URLs when the host permits browser cross-origin access (CORS). Direct downloads are capped at 100 MB.
 
-Apple catalog search uses Apple's public iTunes Search/Lookup endpoint from the browser. It does not scrape Apple Music pages. Apple artwork files are fetched from Apple's image CDN when the user downloads them.
+## Other catalogs
 
-## Platform limits
+- Anime and manga search use AniList and Jikan from the browser.
+- YouTube links can show a thumbnail using YouTube's oEmbed endpoint. This does not extract or download YouTube video files.
+- Additional platforms such as Instagram require a compatible download service. A static GitHub Pages site cannot bypass platform restrictions or host a server-side extractor.
 
-GitHub Pages hosts static HTML, CSS, and JavaScript only. It can host Rupa's interface and the browser-side Apple/direct-file tools. A YouTube or Instagram page URL is not a direct media URL; extracting those media files needs a separate server-side service. Those platform tools remain unavailable until that service is deployed.
-
-The direct URL tool also depends on the media host's CORS policy. If the host blocks browser access, GitHub Pages cannot proxy around that restriction.
+Rupa has no custom scraping service or Rupa download API. Catalog searches and motion artwork lookups call public third-party endpoints directly from the browser; media files are downloaded to the user's device. The direct URL tool depends on the host's CORS policy.
 
 ## Development
 
