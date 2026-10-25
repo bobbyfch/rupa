@@ -45,6 +45,6 @@ jobs:
           {
             echo "## Worker deployed"
             echo
-            echo "Copy the workers.dev URL shown in the deploy log into the repository Actions variable `VITE_API_URL`."
-            echo "Then rerun **Deploy RUPA to GitHub Pages** so the frontend connects to this Worker."
+            echo "Copy the workers.dev URL shown in the deploy log."
+            echo "Run **Deploy RUPA to GitHub Pages** manually and paste the URL into its Worker URL field, or save it as the repository Actions variable VITE_API_URL."
           } >> "$GITHUB_STEP_SUMMARY"
