@@ -15,7 +15,7 @@ Rupa is a static, browser-based media and artwork downloader. Apple tools are gr
 
 - Anime and manga search use AniList and Jikan from the browser.
 - YouTube links can show and download thumbnails using YouTube's oEmbed endpoint. This does not extract or download YouTube video files.
-- Instagram is listed as a planned tool. Instagram and full YouTube downloads require a compatible media service; a static GitHub Pages site cannot bypass platform restrictions or host a server-side extractor.
+- Instagram is listed as a planned tool. Instagram and full YouTube downloads require a compatible media service; a static site cannot bypass platform restrictions or host a server-side extractor.
 
 Rupa has no custom scraping service or Rupa download API. Catalog searches and motion artwork lookups call public third-party endpoints directly from the browser; media files are downloaded to the user's device. The direct URL tool depends on the host's CORS policy.
 
@@ -28,4 +28,23 @@ npm run build
 npm run preview
 ```
 
-The `main` branch deploys to GitHub Pages through `.github/workflows/deploy-pages.yml`.
+## Production deployment — Cloudflare Workers
+
+GitHub is source control, not a website host or deployment runner. The only production branch is `main`. A push to `main` should trigger a single Cloudflare Workers Build using the checked-in `wrangler.jsonc`; there are no GitHub Pages or GitHub Actions deployment workflows.
+
+Connect **one** Worker named `rupa-site` to this GitHub repository in **Workers & Pages → rupa-site → Settings → Builds**. Do not create a second Worker if that name already exists. Use:
+
+- Production branch: `main`
+- Project root: repository root
+- Build command: `npm run build`
+- Deploy command: `npx wrangler deploy`
+- Node.js: 24 (see `.node-version`)
+- Worker static assets: `dist/` (read from `wrangler.jsonc`; do not specify a Pages output directory)
+- Intended custom domain: `rupa.limaraya.com` (requires confirming the domain and Worker in your Cloudflare account)
+
+The repository's old GitHub Pages deployment and PR-only CI workflows have been removed. `npm run build` already executes TypeScript validation before bundling. Confirm the new Workers deployment succeeds before disabling an existing live GitHub Pages site in repository settings; changing repository files alone does not disable GitHub Pages in GitHub's settings.
+
+## Local development
+
+Use `npm ci`, `npm run dev` and `npm run build`. Vite uses `/` as its production base, appropriate for a Cloudflare root domain; `VITE_BASE_PATH` remains available for exceptional subpath deployments.
+

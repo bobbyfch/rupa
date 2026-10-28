@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "rupa-site",
+  "compatibility_date": "2026-10-28",
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "rupa.limaraya.com",
+      "custom_domain": true
+    }
+  ],
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  "observability": {
+    "enabled": true
+  }
+}
